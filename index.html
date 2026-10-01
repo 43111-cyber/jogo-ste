@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>STREET GOAL - Futebol de Rua Arcade</title>
+  <meta name="description" content="Jogo arcade de futebol de rua com times e jogadores reais. Modos 1 Jogador e 2 Jogadores local no teclado.">
+  
+  <!-- Google Fonts para estilo esportivo urbano arcade -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Teko:wght@500;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrapper">
+    <!-- Canvas Principal do Jogo -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD Superior durante a Partida -->
+    <header id="hud" class="ui-layer hidden">
+      <div class="hud-team hud-team-left">
+        <div class="team-badge" id="hud-badge-home"></div>
+        <div class="team-info">
+          <span class="team-name" id="hud-name-home">REAL MADRID</span>
+          <span class="player-controlled" id="hud-player-home">VINI JR (P1)</span>
+        </div>
+        <div class="team-score" id="hud-score-home">0</div>
+      </div>
+
+      <div class="hud-center">
+        <div class="hud-timer" id="hud-timer">03:00</div>
+        <div class="hud-period" id="hud-period">TEMPO NORMAL</div>
+      </div>
+
+      <div class="hud-team hud-team-right">
+        <div class="team-score" id="hud-score-away">0</div>
+        <div class="team-info">
+          <span class="team-name" id="hud-name-away">BARCELONA</span>
+          <span class="player-controlled" id="hud-player-away">L. YAMAL (IA)</span>
+        </div>
+        <div class="team-badge" id="hud-badge-away"></div>
+      </div>
+
+      <div class="hud-actions">
+        <button id="btn-sound-toggle" class="icon-btn" title="Ativar/Desativar Som" aria-label="Som">🔊</button>
+        <button id="btn-pause-toggle" class="icon-btn" title="Pausar Partida" aria-label="Pausa">⏸️</button>
+      </div>
+    </header>
+
+    <!-- Overlay de GOOOOOOL! -->
+    <div id="goal-overlay" class="overlay hidden">
+      <div class="goal-content">
+        <h1 class="goal-title animate-bounce">GOOOOOL!</h1>
+        <div class="goal-scorer" id="goal-scorer-info">VINI JR #7</div>
+        <div class="goal-score-popup" id="goal-score-display">REAL MADRID 1 - 0 BARCELONA</div>
+      </div>
+    </div>
+
+    <!-- Overlay de FIM DE JOGO -->
+    <div id="game-over-overlay" class="overlay hidden">
+      <div class="game-over-box">
+        <div class="game-over-tag">APITO FINAL</div>
+        <h1 class="game-over-title">FIM DE JOGO</h1>
+        
+        <div class="game-over-result">
+          <div class="result-team home">
+            <div class="result-badge" id="result-badge-home"></div>
+            <div class="result-name" id="result-name-home">REAL MADRID</div>
+            <div class="result-score" id="result-score-home">3</div>
+          </div>
+          <div class="result-vs">X</div>
+          <div class="result-team away">
+            <div class="result-score" id="result-score-away">2</div>
+            <div class="result-name" id="result-name-away">BARCELONA</div>
+            <div class="result-badge" id="result-badge-away"></div>
+          </div>
+        </div>
+
+        <div class="winner-announcement" id="winner-announcement">VITÓRIA DO REAL MADRID!</div>
+
+        <div class="game-over-actions">
+          <button id="btn-rematch" class="btn btn-primary btn-pulse">REVANCHE</button>
+          <button id="btn-return-menu" class="btn btn-secondary">MENU PRINCIPAL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay de Pausa -->
+    <div id="pause-overlay" class="overlay hidden">
+      <div class="pause-box">
+        <h2>JOGO PAUSADO</h2>
+        <div class="pause-actions">
+          <button id="btn-resume" class="btn btn-primary">CONTINUAR</button>
+          <button id="btn-pause-menu" class="btn btn-secondary">SAIR PARA O MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TELA 1: MENU PRINCIPAL -->
+    <section id="menu-screen" class="ui-screen">
+      <div class="urban-bg-glow"></div>
+      
+      <div class="menu-header">
+        <div class="arcade-tag">ARCADE STREET SOCCER</div>
+        <h1 class="game-logo">STREET<span>GOAL</span></h1>
+        <p class="game-subtitle">FUTEBOL DE RUA • PURA HABILIDADE • DRIBLE E CHUTE</p>
+      </div>
+
+      <div class="menu-buttons">
+        <button id="btn-mode-1p" class="btn btn-menu btn-accent">
+          <span class="btn-icon">⚽</span>
+          <span class="btn-text">
+            <strong>1 JOGADOR</strong>
+            <small>Você vs Inteligência Artificial</small>
+          </span>
+        </button>
+
+        <button id="btn-mode-2p" class="btn btn-menu btn-multi">
+          <span class="btn-icon">👥</span>
+          <span class="btn-text">
+            <strong>2 JOGADORES</strong>
+            <small>Local no mesmo teclado (WASD vs SETAS)</small>
+          </span>
+        </button>
+
+        <button id="btn-how-to-play" class="btn btn-menu btn-info">
+          <span class="btn-icon">🎮</span>
+          <span class="btn-text">
+            <strong>COMO JOGAR</strong>
+            <small>Comandos simples e objetivos</small>
+          </span>
+        </button>
+      </div>
+
+      <div class="menu-footer">
+        <span>Partidas de 3 minutos • 4 contra 4 na quadra • Chutes fortes e dribles no analógico</span>
+        <button id="menu-sound-btn" class="sound-quick-toggle">🔊 SOM ATIVO</button>
+      </div>
+    </section>
+
+    <!-- TELA 2: SELEÇÃO DE TIMES -->
+    <section id="team-select-screen" class="ui-screen hidden">
+      <div class="screen-header">
+        <button id="btn-back-from-team" class="btn-back">← VOLTAR</button>
+        <div class="header-titles">
+          <span class="step-indicator" id="team-select-step">JOGADOR 1</span>
+          <h2 class="screen-title">ESCOLHA SEU TIME</h2>
+        </div>
+        <div class="header-spacer"></div>
+      </div>
+
+      <div class="teams-container" id="teams-grid">
+        <!-- Injetado dinamicamente via JS -->
+      </div>
+    </section>
+
+    <!-- TELA 3: SELEÇÃO DE JOGADORES -->
+    <section id="player-select-screen" class="ui-screen hidden">
+      <div class="screen-header">
+        <button id="btn-back-from-player" class="btn-back">← VOLTAR AO TIME</button>
+        <div class="header-titles">
+          <span class="step-indicator" id="player-select-step">JOGADOR 1</span>
+          <h2 class="screen-title">ESCOLHA SEU CRAQUE</h2>
+        </div>
+        <div class="team-preview-badge" id="player-screen-team-badge"></div>
+      </div>
+
+      <div class="players-container" id="players-grid">
+        <!-- Injetado dinamicamente via JS -->
+      </div>
+    </section>
+
+    <!-- TELA 4: TELA VERSUS (PREVIEW) -->
+    <section id="versus-screen" class="ui-screen hidden">
+      <div class="versus-wrapper">
+        <div class="vs-side vs-home" id="vs-home-card">
+          <div class="vs-badge" id="vs-badge-home"></div>
+          <h2 class="vs-team-name" id="vs-team-home">REAL MADRID</h2>
+          <div class="vs-player-card">
+            <div class="vs-avatar" id="vs-avatar-home"></div>
+            <div class="vs-player-info">
+              <span class="vs-badge-p1">JOGADOR 1 (WASD + ESPAÇO)</span>
+              <strong class="vs-player-name" id="vs-player-name-home">VINÍCIUS JÚNIOR</strong>
+              <small id="vs-player-pos-home">ATACANTE #7</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="vs-center">
+          <div class="vs-circle">VS</div>
+          <button id="btn-start-match" class="btn btn-primary btn-pulse btn-large">ENTRAR NA QUADRA</button>
+        </div>
+
+        <div class="vs-side vs-away" id="vs-away-card">
+          <div class="vs-badge" id="vs-badge-away"></div>
+          <h2 class="vs-team-name" id="vs-team-away">BARCELONA</h2>
+          <div class="vs-player-card">
+            <div class="vs-avatar" id="vs-avatar-away"></div>
+            <div class="vs-player-info">
+              <span class="vs-badge-p2" id="vs-badge-role-away">JOGADOR 2 (SETAS + ENTER)</span>
+              <strong class="vs-player-name" id="vs-player-name-away">LAMINE YAMAL</strong>
+              <small id="vs-player-pos-away">ATACANTE #19</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODAL COMO JOGAR -->
+    <div id="modal-how-to-play" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>COMO JOGAR</h2>
+          <button id="btn-close-how" class="btn-close">&times;</button>
+        </div>
+        
+        <div class="how-grid">
+          <div class="how-column p1-col">
+            <div class="col-title p1-title">JOGADOR 1</div>
+            <div class="key-group">
+              <div class="key-row">
+                <span class="key-badge">W</span>
+                <span class="key-badge">A</span>
+                <span class="key-badge">S</span>
+                <span class="key-badge">D</span>
+              </div>
+              <p class="key-desc">Mover personagem e conduzir a bola</p>
+            </div>
+            <div class="key-group">
+              <div class="key-row">
+                <span class="key-badge wide">ESPAÇO</span>
+              </div>
+              <p class="key-desc">Chutar ao gol (direção que estiver olhando)</p>
+            </div>
+          </div>
+
+          <div class="how-column p2-col">
+            <div class="col-title p2-title">JOGADOR 2</div>
+            <div class="key-group">
+              <div class="key-row">
+                <span class="key-badge">↑</span>
+                <span class="key-badge">←</span>
+                <span class="key-badge">↓</span>
+                <span class="key-badge">→</span>
+              </div>
+              <p class="key-desc">Mover personagem e conduzir a bola</p>
+            </div>
+            <div class="key-group">
+              <div class="key-row">
+                <span class="key-badge wide">ENTER</span>
+              </div>
+              <p class="key-desc">Chutar ao gol (direção que estiver olhando)</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="how-rules">
+          <h3>DICAS DE CRAQUE DE RUA:</h3>
+          <ul>
+            <li><strong>Drible no corpo:</strong> Mude de direção rapidamente enquanto conduz a bola para cortar o adversário.</li>
+            <li><strong>Chute forte:</strong> Jogadores com maior atributo de chute disparam bombas indefensáveis.</li>
+            <li><strong>Goleiro automático:</strong> O goleiro é 100% IA e reage aos chutes e movimentações da bola.</li>
+          </ul>
+        </div>
+
+        <button id="btn-understand" class="btn btn-primary full-width">ENTENDI, VAMOS JOGAR!</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
