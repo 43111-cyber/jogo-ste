@@ -62,7 +62,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, #1e1b2e 0%, #08080c 100%);
+  background: radial-gradient(circle at center, #0284c7 0%, #0369a1 50%, #082f49 100%);
   overflow: hidden;
 }
 
@@ -488,7 +488,7 @@ html, body {
    TELA INICIAL (MENU PRINCIPAL)
    ========================================================== */
 #main-menu {
-  background: radial-gradient(circle at center, rgba(147, 31, 63, 0.25) 0%, rgba(7, 9, 14, 0.88) 85%);
+  background: radial-gradient(circle at center, rgba(14, 165, 233, 0.35) 0%, rgba(8, 20, 38, 0.85) 85%);
 }
 
 .menu-content {

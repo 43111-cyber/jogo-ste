@@ -609,7 +609,6 @@ class Ball {
         this.vy = (this.vy - 2 * dot * ny) * 0.85;
         audio.playPost();
         game.triggerShake(7);
-        game.spawnArcadePopup(this.x, this.y - 20, 'NA TRAVE! 🔥');
       }
     }
   }
@@ -709,6 +708,7 @@ class Player {
     // Animações
     this.walkCycle = 0;
     this.kickAnimTimer = 0;
+    this.kickCooldown = 0; // Cooldown de 1 segundo (60 frames)
     this.dribbleCooldown = 0;
     this.tackleCooldown = 0;
 
@@ -726,6 +726,8 @@ class Player {
     this.isChargingKick = false;
     this.kickCharge = 0;
     this.kickAnimTimer = 0;
+    this.kickCooldown = 0;
+    this.possessionTimer = 0;
   }
 
   update(inputKeys, ball, players, particles) {
@@ -743,7 +745,7 @@ class Player {
 
         // Chute P1 (Espaço)
         const isKickDown = !!inputKeys['Space'];
-        this.handleKickButton(isKickDown, ball, particles);
+        this.handleKickButton(isKickDown, ball, players, particles);
 
       } else if (this.controlId === 2) {
         // Player 2: Setas + Enter
@@ -754,14 +756,16 @@ class Player {
 
         // Chute P2 (Enter)
         const isKickDown = !!inputKeys['Enter'];
-        this.handleKickButton(isKickDown, ball, particles);
+        this.handleKickButton(isKickDown, ball, players, particles);
       }
     } else {
       // 2. Inteligência Artificial (IA)
       const aiInput = this.computeAI(ball, players);
       moveX = aiInput.x;
       moveY = aiInput.y;
-      if (aiInput.wantKick) {
+      if (aiInput.wantPass && aiInput.passTarget) {
+        this.passTo(aiInput.passTarget, ball, particles);
+      } else if (aiInput.wantKick) {
         this.executeInstantKick(ball, particles, aiInput.kickPower || 0.7);
       }
     }
@@ -795,6 +799,7 @@ class Player {
     this.y = Math.max(WORLD.courtTop + this.radius, Math.min(WORLD.courtBottom - this.radius, this.y));
 
     // Decréscimo de cooldowns
+    if (this.kickCooldown > 0) this.kickCooldown--;
     if (this.dribbleCooldown > 0) this.dribbleCooldown--;
     if (this.tackleCooldown > 0) this.tackleCooldown--;
     if (this.kickAnimTimer > 0) this.kickAnimTimer--;
@@ -803,11 +808,32 @@ class Player {
     this.handleBallContact(ball, particles);
   }
 
-  // Lógica de segurar para carregar chute
-  handleKickButton(isKeyDown, ball, particles) {
+  // Lógica de segurar para carregar chute e pedir passe
+  handleKickButton(isKeyDown, ball, players, particles) {
+    if (this.kickCooldown > 0) {
+      this.isChargingKick = false;
+      this.kickCharge = 0;
+      return;
+    }
+
+    const distToBall = Math.hypot(ball.x - this.x, ball.y - this.y);
+    const inBallRange = distToBall <= (this.radius + ball.radius + 24);
+
     if (isKeyDown) {
-      this.isChargingKick = true;
-      this.kickCharge = Math.min(1.0, this.kickCharge + 0.035); // Enche em aprox 0.8s
+      if (inBallRange) {
+        // Perto da bola: carrega o chute
+        this.isChargingKick = true;
+        this.kickCharge = Math.min(1.0, this.kickCharge + 0.035);
+      } else {
+        // Longe da bola apertou o botão: pede passe pro companheiro bot ("Toca pra mim!")
+        const botTeammate = players && players.find(p => p.team === this.team && p !== this && !p.isControlled);
+        if (botTeammate) {
+          const distBot = Math.hypot(ball.x - botTeammate.x, ball.y - botTeammate.y);
+          if (distBot < botTeammate.radius + ball.radius + 26) {
+            botTeammate.passTo(this, ball, particles);
+          }
+        }
+      }
     } else if (this.isChargingKick) {
       // Soltou o botão: dispara o chute!
       this.executeKick(ball, particles);
@@ -817,6 +843,7 @@ class Player {
   }
 
   executeKick(ball, particles) {
+    if (this.kickCooldown > 0) return;
     const dist = Math.hypot(ball.x - this.x, ball.y - this.y);
     const kickRange = this.radius + ball.radius + 20;
 
@@ -843,13 +870,13 @@ class Player {
       ball.lastTouchPlayer = this;
 
       this.kickAnimTimer = 14;
+      this.kickCooldown = 60; // 1 segundo (60 frames) de intervalo para poder chutar de novo
 
       // Sons e Efeitos
       audio.playKick(powerPct);
       if (ball.isSuperShot) {
         game.triggerShake(7);
         particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 14);
-        game.spawnArcadePopup(this.x, this.y - 25, 'CHUTAÇO! 🔥');
       } else {
         particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 4);
       }
@@ -857,6 +884,7 @@ class Player {
   }
 
   executeInstantKick(ball, particles, power = 0.55) {
+    if (this.kickCooldown > 0) return;
     const dist = Math.hypot(ball.x - this.x, ball.y - this.y);
     const kickRange = this.radius + ball.radius + 18;
 
@@ -875,11 +903,42 @@ class Player {
       ball.lastTouchPlayer = this;
 
       this.kickAnimTimer = 12;
+      this.kickCooldown = 60; // 1 segundo de intervalo para poder chutar de novo
       audio.playKick(power);
       if (ball.isSuperShot) {
         game.triggerShake(5);
         particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 8);
       }
+    }
+  }
+
+  // Passe direcionado inteligente do bot para o companheiro
+  passTo(targetPlayer, ball, particles) {
+    if (this.kickCooldown > 0) return;
+    const dist = Math.hypot(ball.x - this.x, ball.y - this.y);
+    const kickRange = this.radius + ball.radius + 24;
+
+    if (dist <= kickRange) {
+      // Calcular antecipação na direção de movimento do companheiro
+      const leadX = targetPlayer.x + targetPlayer.vx * 7;
+      const leadY = targetPlayer.y + targetPlayer.vy * 7;
+      const angle = Math.atan2(leadY - this.y, leadX - this.x);
+      const distToPartner = Math.hypot(leadX - this.x, leadY - this.y);
+
+      // Força de passe calculada para chegar suave e precisa nos pés
+      const passPower = Math.min(8.2, Math.max(4.5, distToPartner * 0.015 + 4.0));
+
+      ball.vx = Math.cos(angle) * passPower;
+      ball.vy = Math.sin(angle) * passPower;
+      ball.isSuperShot = false;
+      ball.lastTouchPlayer = this;
+
+      this.facingAngle = angle;
+      this.kickAnimTimer = 12;
+      this.kickCooldown = 60; // 1 segundo de intervalo
+
+      audio.playKick(0.35);
+      particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 4);
     }
   }
 
@@ -913,9 +972,6 @@ class Player {
         if (playerSpeed > 1.8 && this.dribbleCooldown <= 0) {
           this.dribbleCooldown = 120;
           audio.playDribble();
-          const dribleWords = ['CANETA! ✨', 'CHAPÉU! 🎩', 'DRIBLE! 💫'];
-          const word = dribleWords[Math.floor(Math.random() * dribleWords.length)];
-          game.spawnArcadePopup(this.x, this.y - 25, word);
         }
       } else {
         // Jogador parado ou quase parado: amortece a bola suavemente
@@ -934,7 +990,7 @@ class Player {
 
   // Comportamento Inteligente da IA para adversários e companheiros
   computeAI(ball, players) {
-    const input = { x: 0, y: 0, wantKick: false, kickPower: 0.65 };
+    const input = { x: 0, y: 0, wantKick: false, wantPass: false, passTarget: null, kickPower: 0.65 };
 
     const targetGoalX = this.team === 'beico' ? WORLD.courtRight : WORLD.courtLeft;
     const ownGoalX = this.team === 'beico' ? WORLD.courtLeft : WORLD.courtRight;
@@ -942,14 +998,62 @@ class Player {
 
     const distToBall = Math.hypot(ball.x - this.x, ball.y - this.y);
     const distToTargetGoal = Math.hypot(targetGoalX - this.x, midGoalY - this.y);
+    const hasBall = (distToBall < this.radius + ball.radius + 14);
 
+    // Verificar se há um companheiro humano no mesmo time
+    const humanTeammate = players && players.find(p => p.team === this.team && p.isControlled);
+
+    // 1. SE O BOT FOR COMPANHEIRO DO JOGADOR HUMANO (ex: Biel):
+    if (humanTeammate) {
+      if (hasBall) {
+        // O bot pegou a bola! Prioridade: TOCAR PARA O JOGADOR HUMANO!
+        this.possessionTimer = (this.possessionTimer || 0) + 1;
+
+        // Vira o corpo de frente para o jogador
+        this.facingAngle = Math.atan2(humanTeammate.y - this.y, humanTeammate.x - this.x);
+
+        // Após breve domínio (10 frames ~ 0.16s), passa a bola para o jogador
+        if (this.possessionTimer > 10 && this.kickCooldown <= 0) {
+          input.wantPass = true;
+          input.passTarget = humanTeammate;
+          this.possessionTimer = 0;
+          return input;
+        }
+
+        // Enquanto prepara o passe, conduz suavemente em direção ao jogador
+        const dx = humanTeammate.x - this.x;
+        const dy = humanTeammate.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 70) {
+          input.x = dx / dist;
+          input.y = dy / dist;
+        }
+        return input;
+      } else {
+        this.possessionTimer = 0;
+
+        // Se o jogador humano já estiver com a bola, o bot companheiro se desmarca
+        const distHumanToBall = Math.hypot(ball.x - humanTeammate.x, ball.y - humanTeammate.y);
+        if (distHumanToBall < humanTeammate.radius + ball.radius + 20) {
+          const openX = Math.min(WORLD.courtRight - 160, Math.max(WORLD.courtLeft + 160, humanTeammate.x + 130));
+          const openY = humanTeammate.y < midGoalY ? midGoalY + 110 : midGoalY - 110;
+          const dx = openX - this.x;
+          const dy = openY - this.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 15) {
+            input.x = dx / dist;
+            input.y = dy / dist;
+          }
+          return input;
+        }
+      }
+    }
+
+    // 2. COMPORTAMENTO PADRÃO (ADVERSÁRIOS OU DISPUTA DE BOLA):
     if (this.role === 'striker') {
       // Atacante: vai direto para a bola quando está no ataque
-      const targetX = ball.x;
-      const targetY = ball.y;
-
-      const dx = targetX - this.x;
-      const dy = targetY - this.y;
+      const dx = ball.x - this.x;
+      const dy = ball.y - this.y;
       const dist = Math.hypot(dx, dy);
 
       if (dist > 6) {
@@ -958,7 +1062,7 @@ class Player {
       }
 
       // Se estiver perto da bola e tiver ângulo pro gol, chuta!
-      if (distToBall < this.radius + ball.radius + 15) {
+      if (distToBall < this.radius + ball.radius + 15 && this.kickCooldown <= 0) {
         if (distToTargetGoal < 420 || Math.random() < 0.08) {
           input.wantKick = true;
           input.kickPower = distToTargetGoal < 300 ? 0.9 : 0.6;
@@ -966,7 +1070,6 @@ class Player {
       }
     } else {
       // Defensor / Goleiro de linha
-      // Fica entre a bola e o próprio gol
       const guardX = ownGoalX + (this.team === 'beico' ? 140 : -140);
       const guardY = Math.max(WORLD.goalYTop - 20, Math.min(WORLD.goalYBottom + 20, ball.y));
 
@@ -978,9 +1081,15 @@ class Player {
         input.x = dx / dist;
         input.y = dy / dist;
 
-        if (distToBall < this.radius + ball.radius + 12) {
-          input.wantKick = true;
-          input.kickPower = 0.85; // Dá um bico pra longe
+        if (distToBall < this.radius + ball.radius + 14 && this.kickCooldown <= 0) {
+          if (humanTeammate) {
+            // Bot companheiro na zaga: toca a bola pro jogador sair jogando!
+            input.wantPass = true;
+            input.passTarget = humanTeammate;
+          } else {
+            input.wantKick = true;
+            input.kickPower = 0.85; // Adversário chuta pra longe
+          }
         }
       } else {
         // Posicionamento defensivo
@@ -1123,18 +1232,31 @@ class Player {
 // ====================================================================
 // 6. MOTOR DO CENÁRIO DA FAVELA (QUADRA, CASAS, GRAFITES, VARAL)
 // ====================================================================
+// ====================================================================
+// 6. MOTOR DO CENÁRIO DA FAVELA DE DIA (QUADRA CERCADA DE FAVELA)
+// ====================================================================
 class FavelaScenery {
   constructor() {
     this.windTime = 0;
-    // Pessoas assistindo ao jogo (torcida de rua nas lajes e muros)
+    // Torcida nas lajes e sacadas ao redor de toda a quadra
     this.fans = [
+      // Fundo (Topo da Quadra)
       { x: 160, y: 130, color: '#facc15', hair: '#111', bobSpeed: 3.5, jump: 0 },
       { x: 230, y: 125, color: '#ef4444', hair: '#fef08a', bobSpeed: 4.1, jump: 0 },
       { x: 340, y: 135, color: '#10b981', hair: '#3b82f6', bobSpeed: 2.8, jump: 0 },
       { x: 500, y: 120, color: '#8b5cf6', hair: '#111', bobSpeed: 3.2, jump: 0 },
+      { x: 620, y: 128, color: '#f59e0b', hair: '#fef08a', bobSpeed: 3.9, jump: 0 },
       { x: 780, y: 125, color: '#ec4899', hair: '#fff', bobSpeed: 4.5, jump: 0 },
       { x: 920, y: 132, color: '#38bdf8', hair: '#111', bobSpeed: 3.0, jump: 0 },
-      { x: 1040, y: 122, color: '#f97316', hair: '#fef08a', bobSpeed: 3.8, jump: 0 }
+      { x: 1040, y: 122, color: '#f97316', hair: '#fef08a', bobSpeed: 3.8, jump: 0 },
+      // Lado Esquerdo (atrás do gol esquerdo)
+      { x: 45, y: 220, color: '#10b981', hair: '#111', bobSpeed: 3.1, jump: 0 },
+      { x: 80, y: 250, color: '#facc15', hair: '#38bdf8', bobSpeed: 4.0, jump: 0 },
+      { x: 55, y: 560, color: '#ef4444', hair: '#fef08a', bobSpeed: 3.4, jump: 0 },
+      // Lado Direito (atrás do gol direito)
+      { x: 1220, y: 220, color: '#38bdf8', hair: '#fef08a', bobSpeed: 3.7, jump: 0 },
+      { x: 1255, y: 260, color: '#ec4899', hair: '#111', bobSpeed: 2.9, jump: 0 },
+      { x: 1230, y: 550, color: '#facc15', hair: '#111', bobSpeed: 4.2, jump: 0 }
     ];
   }
 
@@ -1146,153 +1268,277 @@ class FavelaScenery {
   }
 
   draw(ctx, width, height) {
-    // 1. Céu de Fim de Tarde (Sunset Dourado / Alaranjado da Favela)
+    // 1. Céu Tropical de Dia Ensolarado com Sol, Nuvens e Pipas
+    this.drawSkyAndSun(ctx, width, height);
+
+    // 2. Morro Denso ao Fundo com Centenas de Casinhas de Favela
+    this.drawFarHill(ctx);
+
+    // 3. Casas de Tijolo e Lajes no Meio-Cenário (Fundo)
+    this.drawMidHouses(ctx);
+
+    // 4. Fios de Poste e Roupas no Varal ao Vento
+    this.drawWiresAndLaundry(ctx);
+
+    // 5. Torcida nas Lajes
+    this.drawCrowd(ctx);
+
+    // 6. Muro dos Fundos com Grafites
+    this.drawGraffitiWall(ctx);
+
+    // 7. Quadra de Cimento Iluminada de Dia
+    this.drawCourt(ctx);
+
+    // 8. LADO ESQUERDO DA QUADRA (Casas empilhadas, Boteco com toldo, Escadão)
+    this.drawLeftSideFavela(ctx);
+
+    // 9. LADO DIREITO DA QUADRA (Casas, Viela, Motoca dos crias, Antena)
+    this.drawRightSideFavela(ctx);
+
+    // 10. PARTE INFERIOR (Calçada, Cadeiras de boteco, Isopor, Vira-lata Caramelo, Bike)
+    this.drawBottomFavela(ctx);
+
+    // 11. Traves e Redes dos Gols
+    this.drawGoals(ctx);
+  }
+
+  drawSkyAndSun(ctx, width, height) {
+    ctx.save();
+    // Céu azul tropical de dia ensolarado
     const skyGrad = ctx.createLinearGradient(0, 0, 0, WORLD.courtTop);
-    skyGrad.addColorStop(0, '#2e1065');   // Roxo escuro
-    skyGrad.addColorStop(0.4, '#831843'); // Magenta quente
-    skyGrad.addColorStop(0.75, '#ea580c'); // Laranja pôr do sol
-    skyGrad.addColorStop(1, '#facc15');   // Amarelo dourado horizonte
+    skyGrad.addColorStop(0, '#0284c7');   // Azul celeste profundo
+    skyGrad.addColorStop(0.5, '#38bdf8'); // Azul céu vibrante
+    skyGrad.addColorStop(1, '#bae6fd');   // Haze claro do horizonte ensolarado
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, WORLD.courtTop);
 
-    // Sol Poente da Favela
-    ctx.save();
-    const sunGrad = ctx.createRadialGradient(650, 90, 10, 650, 90, 80);
+    // Sol Brilhante de Meio-Dia
+    const sunX = 960;
+    const sunY = 60;
+
+    // Raios suaves do sol
+    ctx.strokeStyle = 'rgba(254, 240, 138, 0.22)';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI * 2) / 8 + this.windTime * 0.05;
+      ctx.beginPath();
+      ctx.moveTo(sunX + Math.cos(a) * 35, sunY + Math.sin(a) * 35);
+      ctx.lineTo(sunX + Math.cos(a) * 75, sunY + Math.sin(a) * 75);
+      ctx.stroke();
+    }
+
+    // Brilho e núcleo do Sol
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 12, sunX, sunY, 65);
     sunGrad.addColorStop(0, '#ffffff');
     sunGrad.addColorStop(0.3, '#fef08a');
-    sunGrad.addColorStop(0.7, 'rgba(249, 115, 22, 0.4)');
+    sunGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.35)');
     sunGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = sunGrad;
     ctx.beginPath();
-    ctx.arc(650, 90, 80, 0, Math.PI * 2);
+    ctx.arc(sunX, sunY, 65, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Nuvens Brancas de Verão
+    this.drawCloud(ctx, (120 + this.windTime * 4) % (WORLD.width + 160) - 80, 40, 48);
+    this.drawCloud(ctx, (540 + this.windTime * 3) % (WORLD.width + 160) - 80, 55, 60);
+    this.drawCloud(ctx, (980 + this.windTime * 3.5) % (WORLD.width + 160) - 80, 32, 52);
+
+    // Pipas de Combate no Céu (clássico da favela brasileira)
+    this.drawKite(ctx, 310, 45 + Math.sin(this.windTime * 2) * 8, '#ef4444', '#facc15');
+    this.drawKite(ctx, 730, 35 + Math.sin(this.windTime * 1.8 + 1) * 7, '#0284c7', '#ffffff');
+
+    ctx.restore();
+  }
+
+  drawCloud(ctx, x, y, size) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.45, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.35, y - size * 0.15, size * 0.4, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.7, y, size * 0.38, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
 
-    // 2. Morro ao Fundo com Casas Empilhadas (Camada Distante)
-    this.drawFarHill(ctx);
+  drawKite(ctx, x, y, color1, color2) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(this.windTime * 2) * 0.15);
 
-    // 3. Casas de Tijolo e Lajes no Meio-Cenário (Camada Média)
-    this.drawMidHouses(ctx);
+    // Losango da Pipa
+    ctx.fillStyle = color1;
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(9, 0);
+    ctx.lineTo(0, 14);
+    ctx.lineTo(-9, 0);
+    ctx.closePath();
+    ctx.fill();
 
-    // 4. Fios de Poste, Pipas e Roupas no Varal
-    this.drawWiresAndLaundry(ctx);
+    // Faixa central contrastante
+    ctx.fillStyle = color2;
+    ctx.beginPath();
+    ctx.moveTo(-9, 0);
+    ctx.lineTo(0, 4);
+    ctx.lineTo(9, 0);
+    ctx.lineTo(0, -4);
+    ctx.closePath();
+    ctx.fill();
 
-    // 5. Torcida nas Lajes e Muros
-    this.drawCrowd(ctx);
+    // Vareta
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(0, 14);
+    ctx.stroke();
 
-    // 6. Muro dos Fundos com Grafites e Pichações
-    this.drawGraffitiWall(ctx);
+    // Rabiola ondulando ao vento
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 14);
+    for (let i = 1; i <= 5; i++) {
+      const rx = Math.sin(this.windTime * 4 + i) * 6;
+      const ry = 14 + i * 8;
+      ctx.lineTo(rx, ry);
+    }
+    ctx.stroke();
 
-    // 7. Quadra de Cimento Gasto com Marcações
-    this.drawCourt(ctx);
-
-    // 8. Traves e Redes dos Gols
-    this.drawGoals(ctx);
+    ctx.restore();
   }
 
   drawFarHill(ctx) {
     ctx.save();
-    // Silhueta do Morro
-    ctx.fillStyle = '#4c1d38';
+    // Morro Verdejante com Formações Rochosas Tropicais
+    ctx.fillStyle = '#15803d'; // Verde floresta tropical
     ctx.beginPath();
-    ctx.moveTo(0, 160);
-    ctx.bezierCurveTo(300, 70, 700, 40, 1300, 120);
+    ctx.moveTo(0, 155);
+    ctx.bezierCurveTo(280, 65, 680, 35, 1300, 110);
     ctx.lineTo(1300, WORLD.courtTop);
     ctx.lineTo(0, WORLD.courtTop);
     ctx.closePath();
     ctx.fill();
 
-    // Mini casinhas com janelinhas acesas no morro
-    for (let i = 0; i < 48; i++) {
-      const hx = 60 + i * 26 + (i % 3) * 5;
-      const hy = 75 + Math.sin(i * 0.4) * 25 + (i % 2) * 12;
-      ctx.fillStyle = (i % 2 === 0) ? '#5c2242' : '#3d162d';
-      ctx.fillRect(hx, hy, 16, 18);
+    // Manchas de rocha e árvores no morro
+    ctx.fillStyle = '#166534';
+    ctx.beginPath();
+    ctx.arc(380, 95, 38, 0, Math.PI * 2);
+    ctx.arc(680, 80, 45, 0, Math.PI * 2);
+    ctx.arc(1020, 110, 40, 0, Math.PI * 2);
+    ctx.fill();
 
-      // Luzes acesas das janelas
-      if (i % 3 !== 0) {
-        ctx.fillStyle = '#fef08a';
-        ctx.fillRect(hx + 4, hy + 5, 4, 4);
+    // Centenas de Casinhas de Favela Empilhadas no Morro
+    const houseColors = ['#ea580c', '#c2410c', '#d97706', '#9a3412', '#cbd5e1', '#b45309'];
+    for (let i = 0; i < 75; i++) {
+      const hx = 40 + i * 17 + (i % 4) * 4;
+      const hy = 65 + Math.sin(i * 0.38) * 28 + (i % 3) * 14;
+      const color = houseColors[i % houseColors.length];
+
+      // Casinha de tijolo
+      ctx.fillStyle = color;
+      ctx.fillRect(hx, hy, 15, 16);
+
+      // Telhado de amianto cinza
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(hx - 1, hy - 2, 17, 3);
+
+      // Caixa d'água azul miniatura no topo
+      if (i % 2 === 0) {
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(hx + 3, hy - 6, 6, 4);
       }
+
+      // Janelinha
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(hx + 3, hy + 5, 3, 4);
     }
     ctx.restore();
   }
 
   drawMidHouses(ctx) {
     ctx.save();
-    // Casas de tijolo baiano e concreto aparente
+    // Casas de Tijolo Baiano, Concreto e Lajes Grandes no Fundo da Quadra
     const houses = [
-      { x: 30, w: 140, h: 90, color: '#b45309', tank: true },
-      { x: 190, w: 130, h: 105, color: '#9a3412', tank: true },
-      { x: 340, w: 160, h: 85, color: '#78350f', tank: false },
-      { x: 520, w: 120, h: 110, color: '#9a3412', tank: true },
-      { x: 660, w: 150, h: 88, color: '#b45309', tank: false },
-      { x: 830, w: 140, h: 100, color: '#78350f', tank: true },
-      { x: 990, w: 150, h: 95, color: '#9a3412', tank: true },
-      { x: 1160, w: 130, h: 115, color: '#b45309', tank: false }
+      { x: 10, w: 120, h: 95, color: '#c2410c', tank: true },
+      { x: 135, w: 140, h: 105, color: '#ea580c', tank: true },
+      { x: 280, w: 125, h: 88, color: '#9a3412', tank: false },
+      { x: 410, w: 150, h: 110, color: '#b45309', tank: true },
+      { x: 565, w: 135, h: 92, color: '#ea580c', tank: false },
+      { x: 705, w: 145, h: 108, color: '#c2410c', tank: true },
+      { x: 855, w: 130, h: 90, color: '#9a3412', tank: false },
+      { x: 990, w: 155, h: 115, color: '#ea580c', tank: true },
+      { x: 1150, w: 140, h: 100, color: '#b45309', tank: true }
     ];
 
     for (const h of houses) {
       const topY = WORLD.courtTop - h.h;
 
-      // Parede de tijolo
+      // Paredes de tijolo com textura
       ctx.fillStyle = h.color;
       ctx.fillRect(h.x, topY, h.w, h.h);
 
-      // Vigas de concreto inacabadas na laje (ferros à mostra)
-      ctx.fillStyle = '#57534e';
-      ctx.fillRect(h.x + 8, topY - 14, 8, 14);
-      ctx.fillRect(h.x + h.w - 16, topY - 14, 8, 14);
-      // Ferros da laje
+      // Vigas e pilares de concreto
+      ctx.fillStyle = '#78716c';
+      ctx.fillRect(h.x + 6, topY - 14, 8, 14);
+      ctx.fillRect(h.x + h.w - 14, topY - 14, 8, 14);
+
+      // Ferros da laje expostos (clássico da favela)
       ctx.strokeStyle = '#44403c';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.moveTo(h.x + 10, topY - 14);
-      ctx.lineTo(h.x + 10, topY - 24);
-      ctx.moveTo(h.x + h.w - 14, topY - 14);
-      ctx.lineTo(h.x + h.w - 14, topY - 24);
+      ctx.moveTo(h.x + 9, topY - 14);
+      ctx.lineTo(h.x + 9, topY - 26);
+      ctx.moveTo(h.x + h.w - 11, topY - 14);
+      ctx.lineTo(h.x + h.w - 11, topY - 26);
       ctx.stroke();
 
-      // Caixa d'água azul no topo da laje
+      // Caixa d'água azul Fortlev
       if (h.tank) {
-        ctx.fillStyle = '#0284c7'; // Azul caixa d'água
+        ctx.fillStyle = '#0284c7';
         ctx.beginPath();
-        ctx.roundRect(h.x + h.w / 2 - 14, topY - 18, 28, 18, [3, 3, 0, 0]);
+        ctx.roundRect(h.x + h.w / 2 - 15, topY - 20, 30, 20, [4, 4, 0, 0]);
         ctx.fill();
         ctx.fillStyle = '#0369a1';
-        ctx.fillRect(h.x + h.w / 2 - 16, topY - 21, 32, 4); // Tampa
+        ctx.fillRect(h.x + h.w / 2 - 17, topY - 23, 34, 4); // Tampa
       }
 
-      // Janelas
+      // Janelas de alumínio e cortinas coloridas
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(h.x + 18, topY + 24, 22, 28);
-      ctx.fillRect(h.x + h.w - 40, topY + 24, 22, 28);
+      ctx.fillRect(h.x + 18, topY + 22, 22, 26);
+      ctx.fillRect(h.x + h.w - 40, topY + 22, 22, 26);
+      // Cortina
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(h.x + 18, topY + 22, 8, 26);
     }
     ctx.restore();
   }
 
   drawWiresAndLaundry(ctx) {
     ctx.save();
-    // Fios de poste cruzando o céu
+    // Fios de postes e emaranhado clássico de fiação
     ctx.strokeStyle = '#18181b';
     ctx.lineWidth = 1.6;
 
     ctx.beginPath();
-    ctx.moveTo(0, 70);
-    ctx.bezierCurveTo(400, 130, 800, 120, 1300, 80);
-    ctx.moveTo(0, 95);
-    ctx.bezierCurveTo(500, 150, 900, 140, 1300, 105);
+    ctx.moveTo(0, 60);
+    ctx.bezierCurveTo(380, 115, 780, 110, 1300, 70);
+    ctx.moveTo(0, 85);
+    ctx.bezierCurveTo(450, 140, 880, 130, 1300, 95);
+    ctx.moveTo(180, 80);
+    ctx.lineTo(420, 160);
     ctx.stroke();
 
-    // Roupas no varal fluttering ao vento
+    // Roupas no Varal Fluttering ao Vento
     const clothes = [
-      { x: 380, y: 124, color: '#facc15', w: 14, h: 18 },
-      { x: 405, y: 126, color: '#ffffff', w: 12, h: 20 },
-      { x: 428, y: 127, color: '#ef4444', w: 16, h: 16 },
-      { x: 454, y: 126, color: '#38bdf8', w: 14, h: 18 },
-      { x: 710, y: 124, color: '#10b981', w: 15, h: 18 },
-      { x: 735, y: 125, color: '#ffffff', w: 14, h: 22 },
-      { x: 760, y: 123, color: '#f43f5e', w: 16, h: 17 }
+      { x: 260, y: 122, color: '#facc15', w: 14, h: 18 },
+      { x: 285, y: 123, color: '#ffffff', w: 12, h: 20 },
+      { x: 308, y: 124, color: '#ef4444', w: 16, h: 16 },
+      { x: 670, y: 122, color: '#10b981', w: 15, h: 18 },
+      { x: 695, y: 124, color: '#ffffff', w: 13, h: 22 },
+      { x: 720, y: 121, color: '#38bdf8', w: 15, h: 17 },
+      { x: 885, y: 123, color: '#f43f5e', w: 14, h: 18 }
     ];
 
     for (const c of clothes) {
@@ -1324,7 +1570,7 @@ class FavelaScenery {
       ctx.beginPath();
       ctx.arc(fan.x, fy - 2, 6, Math.PI, Math.PI * 2);
       ctx.fill();
-      // Braços acenando quando vibram
+      // Braços vibrando
       ctx.strokeStyle = fan.color;
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -1339,14 +1585,14 @@ class FavelaScenery {
 
   drawGraffitiWall(ctx) {
     ctx.save();
-    // Muro de tijolo/concreto atrás da quadra
     const wallY = WORLD.courtTop - 35;
     const wallH = 35;
 
-    ctx.fillStyle = '#292524';
+    // Muro de Concreto do Fundo
+    ctx.fillStyle = '#334155';
     ctx.fillRect(WORLD.courtLeft, wallY, WORLD.courtRight - WORLD.courtLeft, wallH);
 
-    // Grafites na parede
+    // Grafites de Rua
     ctx.font = 'bold 16px "Permanent Marker", cursive';
     ctx.fillStyle = '#facc15';
     ctx.fillText('É O BEIÇO ⚡', 240, wallY + 24);
@@ -1354,14 +1600,14 @@ class FavelaScenery {
     ctx.fillStyle = '#ff0055';
     ctx.fillText('FAVELA VENCE!', 520, wallY + 24);
 
-    ctx.fillStyle = '#00ff88';
+    ctx.fillStyle = '#10b981';
     ctx.fillText('RUA 10 ⚽', 850, wallY + 24);
 
     ctx.fillStyle = '#38bdf8';
     ctx.fillText('SÓ OS CRIA', 1010, wallY + 24);
 
-    // Mureta de ferro/gradil
-    ctx.strokeStyle = '#44403c';
+    // Gradil / Mureta de proteção
+    ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 2;
     for (let x = WORLD.courtLeft; x <= WORLD.courtRight; x += 30) {
       ctx.beginPath();
@@ -1377,6 +1623,285 @@ class FavelaScenery {
     ctx.restore();
   }
 
+  // ====================================================================
+  // LADO ESQUERDO DA QUADRA (Casas empilhadas, Boteco com toldo, Escadão)
+  // ====================================================================
+  drawLeftSideFavela(ctx) {
+    ctx.save();
+    const leftW = WORLD.courtLeft; // 120px de largura lateral
+
+    // Casas empilhadas de tijolo e concreto subindo à esquerda
+    ctx.fillStyle = '#c2410c';
+    ctx.fillRect(0, 160, leftW, 530);
+
+    // Divisórias de andares e lajes
+    ctx.fillStyle = '#78716c';
+    ctx.fillRect(0, 310, leftW, 10);
+    ctx.fillRect(0, 480, leftW, 10);
+
+    // Janelas com grades
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(20, 200, 35, 45);
+    ctx.fillRect(70, 200, 35, 45);
+    ctx.fillRect(20, 340, 35, 45);
+    ctx.fillRect(70, 340, 35, 45);
+
+    // Caixa d'água no topo esquerdo
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(25, 140, 40, 22);
+
+    // BOTECO DA ESQUINA (com toldo listrado vermelho e amarelo)
+    const botecoY = 500;
+    // Toldo listrado
+    const stripes = ['#ef4444', '#facc15', '#ef4444', '#facc15', '#ef4444', '#facc15'];
+    for (let i = 0; i < stripes.length; i++) {
+      ctx.fillStyle = stripes[i];
+      ctx.fillRect(i * 18, botecoY, 18, 22);
+    }
+    // Balcão de madeira
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(10, botecoY + 22, 95, 30);
+    // Letreiro do Boteco
+    ctx.font = 'bold 9px Outfit';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('BOTECO DO ZÉ', 16, botecoY + 38);
+
+    // Escadão da favela subindo à esquerda
+    ctx.fillStyle = '#57534e';
+    for (let s = 0; s < 6; s++) {
+      ctx.fillRect(5, 600 + s * 10, 60 - s * 5, 8);
+    }
+
+    // Grafite lateral
+    ctx.font = 'bold 15px "Permanent Marker", cursive';
+    ctx.fillStyle = '#facc15';
+    ctx.save();
+    ctx.translate(108, 420);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('BEIÇO 10 ⚡', 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // ====================================================================
+  // LADO DIREITO DA QUADRA (Casas, Viela, Motoca dos crias, Antena)
+  // ====================================================================
+  drawRightSideFavela(ctx) {
+    ctx.save();
+    const rightX = WORLD.courtRight; // 1180px
+    const rightW = WORLD.width - rightX; // 120px
+
+    // Edificações de tijolo e reboco à direita
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(rightX, 160, rightW, 530);
+
+    // Lajes intermediárias de concreto
+    ctx.fillStyle = '#78716c';
+    ctx.fillRect(rightX, 300, rightW, 10);
+    ctx.fillRect(rightX, 470, rightW, 10);
+
+    // Janelas
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(rightX + 15, 200, 35, 45);
+    ctx.fillRect(rightX + 65, 200, 35, 45);
+    ctx.fillRect(rightX + 15, 335, 35, 45);
+    ctx.fillRect(rightX + 65, 335, 35, 45);
+
+    // Caixa d'água no topo direito
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(rightX + 45, 140, 42, 22);
+
+    // Antena Parabólica espinha de peixe
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rightX + 80, 160);
+    ctx.lineTo(rightX + 80, 120);
+    for (let r = 0; r < 4; r++) {
+      ctx.moveTo(rightX + 70 + r * 5, 125 + r * 6);
+      ctx.lineTo(rightX + 90 - r * 5, 125 + r * 6);
+    }
+    ctx.stroke();
+
+    // VIELA / BECO DA QUEBRADA COM MOTOCA ESTACIONADA (HONDA CG 160)
+    const motoY = 540;
+    const motoX = rightX + 35;
+
+    // Sombra da moto
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(motoX + 22, motoY + 28, 26, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rodas da moto
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.arc(motoX + 6, motoY + 24, 9, 0, Math.PI * 2);
+    ctx.arc(motoX + 40, motoY + 24, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(motoX + 6, motoY + 24, 4, 0, Math.PI * 2);
+    ctx.arc(motoX + 40, motoY + 24, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Quadro e escapamento cromado
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(motoX + 16, motoY + 24);
+    ctx.lineTo(motoX + 38, motoY + 26);
+    ctx.stroke();
+
+    // Tanque Vermelho da CG 160
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.roundRect(motoX + 16, motoY + 10, 16, 9, [4, 6, 2, 2]);
+    ctx.fill();
+
+    // Banco preto e guidão
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(motoX + 26, motoY + 11, 14, 5);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(motoX + 14, motoY + 12);
+    ctx.lineTo(motoX + 10, motoY + 4);
+    ctx.stroke();
+
+    // Grafite vertical na parede direita
+    ctx.font = 'bold 15px "Permanent Marker", cursive';
+    ctx.fillStyle = '#00ff88';
+    ctx.save();
+    ctx.translate(rightX + 12, 420);
+    ctx.rotate(Math.PI / 2);
+    ctx.fillText('RUA 10 ⚽', 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // ====================================================================
+  // PARTE INFERIOR (Calçada, Cadeiras de boteco, Isopor, Vira-lata Caramelo)
+  // ====================================================================
+  drawBottomFavela(ctx) {
+    ctx.save();
+    const botY = WORLD.courtBottom; // 680px
+    const botH = WORLD.height - botY; // 80px
+
+    // Calçada de cimento e meio-fio
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(0, botY, WORLD.width, botH);
+
+    // Meio-fio de concreto pintado de amarelo/cinza
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(0, botY, WORLD.width, 5);
+
+    // Mureta de contenção com grafites
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(0, botY + 45, WORLD.width, botH - 45);
+
+    // Grafites na mureta inferior
+    ctx.font = 'bold 14px "Permanent Marker", cursive';
+    ctx.fillStyle = '#facc15';
+    ctx.fillText('⚽ QUEBRADA UNIDA', 180, botY + 68);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('★ SÓ OS CRIA DA GROTA ★', 540, botY + 68);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText('RESPEITA A FAVELA ⚡', 920, botY + 68);
+
+    // Cadeiras de Plástico de Boteco (Amarela e Vermelha)
+    this.drawPlasticChair(ctx, 280, botY + 12, '#facc15');
+    this.drawPlasticChair(ctx, 310, botY + 12, '#ef4444');
+    this.drawPlasticChair(ctx, 890, botY + 12, '#ef4444');
+    this.drawPlasticChair(ctx, 920, botY + 12, '#facc15');
+
+    // Caixa de Isopor Branca com Latinhas e Gelo
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(345, botY + 18, 28, 18);
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(344, botY + 16, 30, 4); // Tampa azul
+
+    // O CLÁSSICO CACHORRO VIRA-LATA CARAMELO DEITADO NO SOL
+    const dogX = 720;
+    const dogY = botY + 22;
+
+    // Sombra do caramelo
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(dogX + 12, dogY + 12, 18, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Corpo caramelo
+    ctx.fillStyle = '#d97706'; // Amarelo queimado/caramelo
+    ctx.beginPath();
+    ctx.roundRect(dogX, dogY, 24, 11, [6, 6, 4, 4]);
+    ctx.fill();
+
+    // Cabeça do cão
+    ctx.beginPath();
+    ctx.arc(dogX - 3, dogY + 3, 6, 0, Math.PI * 2);
+    ctx.fill();
+    // Orelha caída
+    ctx.fillStyle = '#b45309';
+    ctx.beginPath();
+    ctx.arc(dogX - 5, dogY + 5, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Focinho
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.arc(dogX - 8, dogY + 4, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rabinho abanando no sol com o vento
+    const tailWag = Math.sin(this.windTime * 5) * 4;
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(dogX + 22, dogY + 4);
+    ctx.lineTo(dogX + 29, dogY + 2 + tailWag);
+    ctx.stroke();
+
+    // Bicicletinha aro 20 encostada no muro
+    const bikeX = 460;
+    const bikeY = botY + 12;
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 2;
+    // Rodas
+    ctx.beginPath();
+    ctx.arc(bikeX, bikeY + 14, 8, 0, Math.PI * 2);
+    ctx.arc(bikeX + 26, bikeY + 14, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    // Quadro da bike
+    ctx.beginPath();
+    ctx.moveTo(bikeX, bikeY + 14);
+    ctx.lineTo(bikeX + 12, bikeY + 6);
+    ctx.lineTo(bikeX + 26, bikeY + 14);
+    ctx.moveTo(bikeX + 12, bikeY + 6);
+    ctx.lineTo(bikeX + 8, bikeY + 2); // guidão
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawPlasticChair(ctx, x, y, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    // Encosto
+    ctx.fillRect(x, y, 14, 16);
+    // Assento
+    ctx.fillRect(x - 2, y + 14, 18, 5);
+    // Pernas
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(x - 1, y + 19, 2.5, 9);
+    ctx.fillRect(x + 13, y + 19, 2.5, 9);
+    ctx.restore();
+  }
+
+  // ====================================================================
+  // QUADRA DE CIMENTO ILUMINADA DE DIA
+  // ====================================================================
   drawCourt(ctx) {
     ctx.save();
     const cl = WORLD.courtLeft;
@@ -1386,22 +1911,22 @@ class FavelaScenery {
     const cw = cr - cl;
     const ch = cb - ct;
 
-    // Piso de Cimento Queimado com Marcas de Desgaste
+    // Piso de Cimento Iluminado pelo Sol de Dia
     const courtGrad = ctx.createLinearGradient(cl, ct, cl, cb);
-    courtGrad.addColorStop(0, '#2b303c');
-    courtGrad.addColorStop(0.5, '#222630');
-    courtGrad.addColorStop(1, '#1b1e26');
+    courtGrad.addColorStop(0, '#475569');   // Cimento cinza médio
+    courtGrad.addColorStop(0.5, '#3b4354'); // Textura de concreto firme
+    courtGrad.addColorStop(1, '#2f3543');   // Base de cimento
     ctx.fillStyle = courtGrad;
     ctx.fillRect(cl, ct, cw, ch);
 
-    // Manchas e rachaduras no cimento (textura de rua)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-    ctx.fillRect(cl + 80, ct + 60, 220, 140);
-    ctx.fillRect(cl + 540, ct + 120, 180, 180);
-    ctx.fillRect(cl + 320, ct + 320, 260, 110);
+    // Manchas de sol e desgaste do asfalto
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillRect(cl + 90, ct + 50, 240, 160);
+    ctx.fillRect(cl + 520, ct + 80, 260, 220);
+    ctx.fillRect(cl + 340, ct + 300, 280, 140);
 
-    // Linhas Pintadas com Tinta Spray Desgastada (Branco/Amarelo)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    // Linhas Pintadas com Tinta Spray Nítidas no Sol (Branco e Amarelo)
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
 
@@ -1422,12 +1947,12 @@ class FavelaScenery {
     ctx.stroke();
 
     // Ponto Central
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(midX, midY, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pequenas Áreas / Linhas de Pênalti de Rua
+    // Pequenas Áreas / Linhas de Pênalti
     // Lado Esquerdo
     ctx.strokeRect(cl, midY - 110, 110, 220);
     ctx.beginPath();
@@ -1443,7 +1968,7 @@ class FavelaScenery {
     // Marcações de spray no chão: "BEIÇO STREET"
     ctx.font = '900 24px Outfit';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(250, 204, 21, 0.12)';
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.22)';
     ctx.fillText('★ BEIÇO STREET ★', midX, midY + 45);
 
     ctx.restore();
@@ -1459,9 +1984,9 @@ class FavelaScenery {
 
     // 1. GOL ESQUERDO
     // Rede do fundo
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
     ctx.lineWidth = 1.2;
-    ctx.fillStyle = 'rgba(10, 15, 25, 0.55)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
     ctx.fillRect(cl - gd, gt, gd, gb - gt);
 
     for (let y = gt; y <= gb; y += 12) {
@@ -1477,7 +2002,7 @@ class FavelaScenery {
       ctx.stroke();
     }
 
-    // Traves metálicas esquerdas (ferro branco/amarelo)
+    // Traves metálicas esquerdas (ferro branco pintado)
     ctx.lineWidth = 6;
     ctx.strokeStyle = '#ffffff';
     ctx.beginPath();
@@ -2017,21 +2542,8 @@ class GameEngine {
   }
 
   spawnArcadePopup(worldX, worldY, text) {
-    const tag = document.createElement('div');
-    tag.className = 'arcade-tag';
-    tag.textContent = text;
-
-    // Converter coordenada do mundo para a tela
-    const screenX = (worldX - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
-    const screenY = (worldY - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
-
-    tag.style.left = `${screenX}px`;
-    tag.style.top = `${screenY}px`;
-
-    this.popupsContainer.appendChild(tag);
-    setTimeout(() => {
-      tag.remove();
-    }, 1000);
+    // Mensagens na tela desativadas a pedido do jogador
+    return;
   }
 
   // ====================================================================
