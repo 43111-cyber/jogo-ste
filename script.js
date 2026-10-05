@@ -314,15 +314,15 @@ const WORLD = {
   courtRight: 1180,
   courtTop: 180,
   courtBottom: 680,
-  // Gols (Metragem e Profundidade)
-  goalYTop: 360,
-  goalYBottom: 500,
-  goalDepth: 55,
+  // Gols (Metragem e Profundidade - Gol aumentado para futebol de rua dinâmico)
+  goalYTop: 295,
+  goalYBottom: 565,
+  goalDepth: 60,
   postRadius: 6,
-  // Física da Bola
+  // Física da Bola (Mais rápida e fluida com bom rolamento)
   ballRadius: 10,
   friction: 0.962,
-  wallRestitution: 0.65
+  wallRestitution: 0.68
 };
 
 // ====================================================================
@@ -694,8 +694,8 @@ class Player {
     this.vy = 0;
     this.facingAngle = config.team === 'beico' ? 0 : Math.PI;
     this.radius = 16;
-    this.speed = config.speed || 2.4;
-    this.kickPowerMax = 11.2;
+    this.speed = config.speed || 1.72; // Cadência mais lerda, controlada e precisa
+    this.kickPowerMax = 7.8; // Chute calibrado com a nova velocidade da bola
 
     // Visual / Aparência
     this.skinTone = config.skinTone || '#8d5524';
@@ -712,9 +712,10 @@ class Player {
     this.dribbleCooldown = 0;
     this.tackleCooldown = 0;
 
-    // Chute Carregado
+    // Chute Carregado e Condução
     this.isChargingKick = false;
     this.kickCharge = 0; // 0.0 a 1.0
+    this.conductionTimer = 0;
   }
 
   reset() {
@@ -728,34 +729,59 @@ class Player {
     this.kickAnimTimer = 0;
     this.kickCooldown = 0;
     this.possessionTimer = 0;
+    this.conductionTimer = 0;
   }
 
   update(inputKeys, ball, players, particles) {
     let moveX = 0;
     let moveY = 0;
 
-    // 1. Controle Manual pelo Teclado
+    // 1. Controle Manual pelo Teclado com Suporte a Diagonais Fluidas
     if (this.isControlled) {
+      const isSinglePlayer = (window.game && window.game.gameMode === '1P');
       if (this.controlId === 1) {
-        // Player 1: W A S D + ESPAÇO
-        if (inputKeys['KeyW'] || inputKeys['Keyw']) moveY -= 1;
-        if (inputKeys['KeyS'] || inputKeys['Keys']) moveY += 1;
-        if (inputKeys['KeyA'] || inputKeys['Keya']) moveX -= 1;
-        if (inputKeys['KeyD'] || inputKeys['Keyd']) moveX += 1;
+        // Player 1: W A S D (e também Setas se estiver jogando no modo 1 Jogador!)
+        const up = !!(inputKeys['KeyW'] || inputKeys['w'] || inputKeys['W'] || (isSinglePlayer && (inputKeys['ArrowUp'] || inputKeys['arrowup'])));
+        const down = !!(inputKeys['KeyS'] || inputKeys['s'] || inputKeys['S'] || (isSinglePlayer && (inputKeys['ArrowDown'] || inputKeys['arrowdown'])));
+        const left = !!(inputKeys['KeyA'] || inputKeys['a'] || inputKeys['A'] || (isSinglePlayer && (inputKeys['ArrowLeft'] || inputKeys['arrowleft'])));
+        const right = !!(inputKeys['KeyD'] || inputKeys['d'] || inputKeys['D'] || (isSinglePlayer && (inputKeys['ArrowRight'] || inputKeys['arrowright'])));
 
-        // Chute P1 (Espaço)
-        const isKickDown = !!inputKeys['Space'];
+        // Suporte direto para teclas diagonais no teclado numérico (7, 9, 1, 3)
+        if (inputKeys['Numpad7'] || inputKeys['Home']) { moveY -= 1; moveX -= 1; }
+        else if (inputKeys['Numpad9'] || inputKeys['PageUp']) { moveY -= 1; moveX += 1; }
+        else if (inputKeys['Numpad1'] || inputKeys['End']) { moveY += 1; moveX -= 1; }
+        else if (inputKeys['Numpad3'] || inputKeys['PageDown']) { moveY += 1; moveX += 1; }
+        else {
+          if (up) moveY -= 1;
+          if (down) moveY += 1;
+          if (left) moveX -= 1;
+          if (right) moveX += 1;
+        }
+
+        // Chute P1 (Espaço, ou Enter/X no modo 1P)
+        const isKickDown = !!inputKeys['Space'] || (isSinglePlayer && (!!inputKeys['Enter'] || !!inputKeys['KeyX'] || !!inputKeys['x']));
         this.handleKickButton(isKickDown, ball, players, particles);
 
       } else if (this.controlId === 2) {
         // Player 2: Setas + Enter
-        if (inputKeys['ArrowUp']) moveY -= 1;
-        if (inputKeys['ArrowDown']) moveY += 1;
-        if (inputKeys['ArrowLeft']) moveX -= 1;
-        if (inputKeys['ArrowRight']) moveX += 1;
+        const up = !!(inputKeys['ArrowUp'] || inputKeys['arrowup']);
+        const down = !!(inputKeys['ArrowDown'] || inputKeys['arrowdown']);
+        const left = !!(inputKeys['ArrowLeft'] || inputKeys['arrowleft']);
+        const right = !!(inputKeys['ArrowRight'] || inputKeys['arrowright']);
 
-        // Chute P2 (Enter)
-        const isKickDown = !!inputKeys['Enter'];
+        if (inputKeys['Numpad7']) { moveY -= 1; moveX -= 1; }
+        else if (inputKeys['Numpad9']) { moveY -= 1; moveX += 1; }
+        else if (inputKeys['Numpad1']) { moveY += 1; moveX -= 1; }
+        else if (inputKeys['Numpad3']) { moveY += 1; moveX += 1; }
+        else {
+          if (up) moveY -= 1;
+          if (down) moveY += 1;
+          if (left) moveX -= 1;
+          if (right) moveX += 1;
+        }
+
+        // Chute P2 (Enter ou Numpad 0)
+        const isKickDown = !!inputKeys['Enter'] || !!inputKeys['Numpad0'];
         this.handleKickButton(isKickDown, ball, players, particles);
       }
     } else {
@@ -766,11 +792,11 @@ class Player {
       if (aiInput.wantPass && aiInput.passTarget) {
         this.passTo(aiInput.passTarget, ball, particles);
       } else if (aiInput.wantKick) {
-        this.executeInstantKick(ball, particles, aiInput.kickPower || 0.7);
+        this.executeInstantKick(ball, particles, aiInput.kickPower || 0.65);
       }
     }
 
-    // Normalização de movimento diagonal
+    // Normalização e física de movimento diagonal
     const len = Math.hypot(moveX, moveY);
     if (len > 0) {
       moveX /= len;
@@ -778,11 +804,11 @@ class Player {
       this.facingAngle = Math.atan2(moveY, moveX);
       this.vx = moveX * this.speed;
       this.vy = moveY * this.speed;
-      this.walkCycle += 0.15;
+      this.walkCycle += 0.11; // Animação cadenciada sincronizada com os passos
 
       // Soltar poeira do asfalto ao correr
-      if (Math.random() < 0.25) {
-        particles.addDust(this.x, this.y + 12);
+      if (Math.random() < 0.22) {
+        particles.addDust(this.x - moveX * 6, this.y + 12 - moveY * 3);
       }
     } else {
       this.vx *= 0.6;
@@ -850,8 +876,8 @@ class Player {
     // Se estiver no alcance da bola
     if (dist <= kickRange) {
       const powerPct = Math.max(0.2, this.kickCharge);
-      const minPower = 4.5;
-      const maxPower = 11.2;
+      const minPower = 3.6;
+      const maxPower = 9.8; // Bola mais rápida e potente
       const totalPower = minPower + powerPct * (maxPower - minPower);
 
       // Direção do chute: para onde o jogador está virado ou pro gol
@@ -890,11 +916,11 @@ class Player {
 
     if (dist <= kickRange) {
       const targetGoalX = this.team === 'beico' ? WORLD.courtRight : WORLD.courtLeft;
-      const targetGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2 + (Math.random() * 50 - 25);
+      const targetGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2 + (Math.random() * 60 - 30);
       const angle = Math.atan2(targetGoalY - this.y, targetGoalX - this.x);
 
-      const minPower = 4.2;
-      const maxPower = 8.8;
+      const minPower = 3.4;
+      const maxPower = 7.8;
       const totalPower = minPower + power * (maxPower - minPower);
 
       ball.vx = Math.cos(angle) * totalPower;
@@ -925,8 +951,8 @@ class Player {
       const angle = Math.atan2(leadY - this.y, leadX - this.x);
       const distToPartner = Math.hypot(leadX - this.x, leadY - this.y);
 
-      // Força de passe calculada para chegar suave e precisa nos pés
-      const passPower = Math.min(8.2, Math.max(4.5, distToPartner * 0.015 + 4.0));
+      // Força de passe calculada para chegar rápida e precisa nos pés
+      const passPower = Math.min(6.8, Math.max(3.4, distToPartner * 0.012 + 2.8));
 
       ball.vx = Math.cos(angle) * passPower;
       ball.vy = Math.sin(angle) * passPower;
@@ -942,7 +968,7 @@ class Player {
     }
   }
 
-  // Condução da bola suave nos pés (drible arcade de rua controlado)
+  // Condução da bola suave nos pés (drible arcade de rua controlado e dinâmico)
   handleBallContact(ball, particles) {
     // Se acabou de chutar a bola, não captura de volta imediatamente
     if (this.kickAnimTimer > 0) return;
@@ -950,33 +976,33 @@ class Player {
     const dx = ball.x - this.x;
     const dy = ball.y - this.y;
     const dist = Math.hypot(dx, dy);
-    const controlDist = this.radius + ball.radius + 12;
+    const controlDist = this.radius + ball.radius + 14;
 
     if (dist < controlDist) {
       ball.lastTouchPlayer = this;
 
       const playerSpeed = Math.hypot(this.vx, this.vy);
 
-      if (playerSpeed > 0.2) {
+      if (playerSpeed > 0.15) {
         // Condução limpa: a bola fica logo à frente do jogador na direção do movimento
-        const leadDist = this.radius + ball.radius + 3;
+        const leadDist = this.radius + ball.radius + 4;
         const targetX = this.x + Math.cos(this.facingAngle) * leadDist;
         const targetY = this.y + Math.sin(this.facingAngle) * leadDist;
 
-        // Atração suave para a frente dos pés, sem espirrar pro lado
-        const pullFactor = 0.28;
-        ball.vx = ball.vx * 0.4 + (targetX - ball.x) * pullFactor + this.vx * 0.7;
-        ball.vy = ball.vy * 0.4 + (targetY - ball.y) * pullFactor + this.vy * 0.7;
+        // Atração magnética suave para a frente dos pés, permitindo condução em velocidade
+        const pullFactor = 0.26;
+        ball.vx = ball.vx * 0.32 + (targetX - ball.x) * pullFactor + this.vx * 0.72;
+        ball.vy = ball.vy * 0.32 + (targetY - ball.y) * pullFactor + this.vy * 0.72;
 
         // Drible de rua / caneta se estiver em velocidade com cooldown
-        if (playerSpeed > 1.8 && this.dribbleCooldown <= 0) {
+        if (playerSpeed > 1.2 && this.dribbleCooldown <= 0) {
           this.dribbleCooldown = 120;
           audio.playDribble();
         }
       } else {
         // Jogador parado ou quase parado: amortece a bola suavemente
-        ball.vx *= 0.65;
-        ball.vy *= 0.65;
+        ball.vx *= 0.55;
+        ball.vy *= 0.55;
         const minDist = this.radius + ball.radius;
         if (dist < minDist) {
           const nx = Math.cos(this.facingAngle);
@@ -988,7 +1014,7 @@ class Player {
     }
   }
 
-  // Comportamento Inteligente da IA para adversários e companheiros
+  // Comportamento Inteligente da IA: CONDUZ A BOLA, DRIBLA E CHUTA NO MOMENTO CERTO
   computeAI(ball, players) {
     const input = { x: 0, y: 0, wantKick: false, wantPass: false, passTarget: null, kickPower: 0.65 };
 
@@ -998,101 +1024,152 @@ class Player {
 
     const distToBall = Math.hypot(ball.x - this.x, ball.y - this.y);
     const distToTargetGoal = Math.hypot(targetGoalX - this.x, midGoalY - this.y);
-    const hasBall = (distToBall < this.radius + ball.radius + 14);
+    const hasBall = (distToBall < this.radius + ball.radius + 16);
 
-    // Verificar se há um companheiro humano no mesmo time
-    const humanTeammate = players && players.find(p => p.team === this.team && p.isControlled);
+    // Companheiro de time
+    const teammate = players && players.find(p => p.team === this.team && p !== this);
+    const humanTeammate = teammate && teammate.isControlled ? teammate : null;
 
-    // 1. SE O BOT FOR COMPANHEIRO DO JOGADOR HUMANO (ex: Biel):
-    if (humanTeammate) {
-      if (hasBall) {
-        // O bot pegou a bola! Prioridade: TOCAR PARA O JOGADOR HUMANO!
-        this.possessionTimer = (this.possessionTimer || 0) + 1;
-
-        // Vira o corpo de frente para o jogador
-        this.facingAngle = Math.atan2(humanTeammate.y - this.y, humanTeammate.x - this.x);
-
-        // Após breve domínio (10 frames ~ 0.16s), passa a bola para o jogador
-        if (this.possessionTimer > 10 && this.kickCooldown <= 0) {
-          input.wantPass = true;
-          input.passTarget = humanTeammate;
-          this.possessionTimer = 0;
-          return input;
-        }
-
-        // Enquanto prepara o passe, conduz suavemente em direção ao jogador
-        const dx = humanTeammate.x - this.x;
-        const dy = humanTeammate.y - this.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 70) {
-          input.x = dx / dist;
-          input.y = dy / dist;
-        }
-        return input;
-      } else {
-        this.possessionTimer = 0;
-
-        // Se o jogador humano já estiver com a bola, o bot companheiro se desmarca
-        const distHumanToBall = Math.hypot(ball.x - humanTeammate.x, ball.y - humanTeammate.y);
-        if (distHumanToBall < humanTeammate.radius + ball.radius + 20) {
-          const openX = Math.min(WORLD.courtRight - 160, Math.max(WORLD.courtLeft + 160, humanTeammate.x + 130));
-          const openY = humanTeammate.y < midGoalY ? midGoalY + 110 : midGoalY - 110;
-          const dx = openX - this.x;
-          const dy = openY - this.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist > 15) {
-            input.x = dx / dist;
-            input.y = dy / dist;
+    // Encontrar adversário mais próximo para simular finta / drible
+    let nearestOpponent = null;
+    let minOppDist = 9999;
+    if (players) {
+      for (const p of players) {
+        if (p.team !== this.team) {
+          const d = Math.hypot(p.x - this.x, p.y - this.y);
+          if (d < minOppDist) {
+            minOppDist = d;
+            nearestOpponent = p;
           }
-          return input;
         }
       }
     }
 
-    // 2. COMPORTAMENTO PADRÃO (ADVERSÁRIOS OU DISPUTA DE BOLA):
+    if (hasBall) {
+      this.conductionTimer = (this.conductionTimer || 0) + 1;
+    } else {
+      this.conductionTimer = 0;
+    }
+
+    // =================================================================
+    // 1. QUANDO O BOT ESTÁ COM A BOLA: CONDUZ, FAZ FINTAS E NÃO SÓ CHUTA
+    // =================================================================
+    if (hasBall) {
+      // Variação orgânica para drible de rua (fintas suaves e ondulação na condução)
+      const weave = Math.sin(this.conductionTimer * 0.08) * 55;
+      const targetY = Math.max(WORLD.courtTop + 70, Math.min(WORLD.courtBottom - 70, midGoalY + weave));
+
+      // Vetor de corrida avançando com a bola em direção ao gol rival
+      let moveDirX = targetGoalX - this.x;
+      let moveDirY = targetY - this.y;
+
+      // Finta de corpo / desvio lateral se o adversário estiver vindo de frente
+      if (nearestOpponent && minOppDist < 85) {
+        const oppDx = nearestOpponent.x - this.x;
+        const isOppInFront = (this.team === 'beico' && oppDx > 0) || (this.team === 'rivais' && oppDx < 0);
+        if (isOppInFront) {
+          const dodgeSign = (this.y < nearestOpponent.y) ? -1 : 1;
+          moveDirY += dodgeSign * 100;
+        }
+      }
+
+      const moveLen = Math.hypot(moveDirX, moveDirY);
+      if (moveLen > 5) {
+        input.x = moveDirX / moveLen;
+        input.y = moveDirY / moveLen;
+      }
+
+      // DECISÃO DO BOT COMPANHEIRO DO JOGADOR HUMANO (ex: Biel):
+      if (humanTeammate) {
+        // Biel conduz a bola avançando pelo campo (não toca instantaneamente)
+        if (this.conductionTimer > 45 && this.kickCooldown <= 0) {
+          // Se Biel estiver perto da área do gol, ele bate firme pro gol!
+          if (distToTargetGoal < 260) {
+            input.wantKick = true;
+            input.kickPower = 0.85;
+            this.conductionTimer = 0;
+            return input;
+          }
+          // Caso contrário, faz o passe açucarado para o jogador humano
+          input.wantPass = true;
+          input.passTarget = humanTeammate;
+          this.conductionTimer = 0;
+          return input;
+        }
+        return input;
+      }
+
+      // DECISÃO DOS BOTS ADVERSÁRIOS / ATACANTE:
+      if (this.role === 'striker') {
+        // Conduz a bola para o ataque; só finaliza após conduzir (pelo menos 35 frames ~ 0.6s)
+        const canShoot = (this.conductionTimer >= 35 && this.kickCooldown <= 0);
+
+        if (canShoot) {
+          // Finaliza se estiver no terço final (< 300px do gol) ou conduziu bastante tempo
+          if (distToTargetGoal < 300 || this.conductionTimer > 80 || (minOppDist < 45 && distToTargetGoal < 450)) {
+            input.wantKick = true;
+            input.kickPower = distToTargetGoal < 260 ? 0.9 : 0.75;
+            this.conductionTimer = 0;
+            return input;
+          }
+        }
+        return input;
+      } else {
+        // Defensor (Zika): quando desarma, conduz tirando da área antes de passar ou chutar
+        if (this.conductionTimer > 35 && this.kickCooldown <= 0) {
+          if (teammate) {
+            input.wantPass = true;
+            input.passTarget = teammate;
+            this.conductionTimer = 0;
+            return input;
+          } else {
+            input.wantKick = true;
+            input.kickPower = 0.8;
+            this.conductionTimer = 0;
+            return input;
+          }
+        }
+        return input;
+      }
+    }
+
+    // =================================================================
+    // 2. QUANDO O BOT NÃO ESTÁ COM A BOLA: BUSCA E POSICIONAMENTO
+    // =================================================================
     if (this.role === 'striker') {
-      // Atacante: vai direto para a bola quando está no ataque
+      // Atacante corre em direção à bola para dominar e conduzir
       const dx = ball.x - this.x;
       const dy = ball.y - this.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist > 6) {
+      if (dist > 5) {
         input.x = dx / dist;
         input.y = dy / dist;
       }
 
-      // Se estiver perto da bola e tiver ângulo pro gol, chuta!
-      if (distToBall < this.radius + ball.radius + 15 && this.kickCooldown <= 0) {
-        if (distToTargetGoal < 420 || Math.random() < 0.08) {
-          input.wantKick = true;
-          input.kickPower = distToTargetGoal < 300 ? 0.9 : 0.6;
-        }
+      // Rebote imediato apenas se a bola estiver solta na pequena área (< 140px)
+      if (distToBall < this.radius + ball.radius + 12 && distToTargetGoal < 140 && this.kickCooldown <= 0) {
+        input.wantKick = true;
+        input.kickPower = 0.95;
       }
     } else {
-      // Defensor / Goleiro de linha
+      // Defensor / Goleiro da linha
       const guardX = ownGoalX + (this.team === 'beico' ? 140 : -140);
       const guardY = Math.max(WORLD.goalYTop - 20, Math.min(WORLD.goalYBottom + 20, ball.y));
 
-      // Se a bola vier muito perto da área de defesa, dá o bote
-      if (distToBall < 180) {
+      const ballInDefense = (this.team === 'beico' && ball.x < WORLD.courtLeft + 380) ||
+                            (this.team === 'rivais' && ball.x > WORLD.courtRight - 380);
+
+      if (ballInDefense || distToBall < 190) {
         const dx = ball.x - this.x;
         const dy = ball.y - this.y;
         const dist = Math.hypot(dx, dy);
-        input.x = dx / dist;
-        input.y = dy / dist;
-
-        if (distToBall < this.radius + ball.radius + 14 && this.kickCooldown <= 0) {
-          if (humanTeammate) {
-            // Bot companheiro na zaga: toca a bola pro jogador sair jogando!
-            input.wantPass = true;
-            input.passTarget = humanTeammate;
-          } else {
-            input.wantKick = true;
-            input.kickPower = 0.85; // Adversário chuta pra longe
-          }
+        if (dist > 5) {
+          input.x = dx / dist;
+          input.y = dy / dist;
         }
       } else {
-        // Posicionamento defensivo
+        // Posicionamento defensivo protegendo o gol
         const dx = guardX - this.x;
         const dy = guardY - this.y;
         const dist = Math.hypot(dx, dy);
@@ -1107,11 +1184,24 @@ class Player {
   }
 
   draw(ctx) {
-    // 1. Sombra do Jogador
+    const speed = Math.hypot(this.vx, this.vy);
+    const isMoving = speed > 0.12;
+    const cosA = Math.cos(this.facingAngle);
+    const sinA = Math.sin(this.facingAngle);
+
+    // Determinar orientação visual do boneco
+    const isFacingLeft = cosA < -0.15;
+    const isFacingUp = sinA < -0.3; // Costas do jogador (subindo a quadra na diagonal/reto)
+    const isDiagonal = Math.abs(cosA) > 0.35 && Math.abs(sinA) > 0.35;
+
+    // 1. Sombra do Jogador (estica e inclina dinamicamente com a corrida)
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
     ctx.beginPath();
-    ctx.ellipse(this.x, this.y + 12, this.radius * 1.05, this.radius * 0.5, 0, 0, Math.PI * 2);
+    const shadowW = this.radius * (1.05 + (isMoving ? 0.18 : 0));
+    const shadowH = this.radius * 0.48;
+    const shadowTilt = isMoving ? cosA * 0.15 : 0;
+    ctx.ellipse(this.x, this.y + 12, shadowW, shadowH, shadowTilt, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -1136,9 +1226,20 @@ class Player {
       ctx.restore();
     }
 
-    // 3. Desenho do Personagem Estilizado
+    // 3. Desenho do Personagem Estilizado com Rotação/Inclinação Diagonal
     ctx.save();
     ctx.translate(this.x, this.y);
+
+    // Inclinação de corrida na direção do movimento (lean)
+    if (isMoving) {
+      const lean = (isFacingLeft ? -1 : 1) * Math.min(0.18, speed * 0.08) + (isFacingUp ? -0.05 : 0.05);
+      ctx.rotate(lean);
+    }
+
+    // Se estiver virado para a esquerda, espelha no eixo X para dar a direção correta
+    if (isFacingLeft) {
+      ctx.scale(-1, 1);
+    }
 
     // Balanço de corrida
     const legOffset = Math.sin(this.walkCycle) * 6;
@@ -1146,15 +1247,19 @@ class Player {
 
     // Pernas / Tênis de rua
     ctx.fillStyle = this.skinTone;
-    // Perna esquerda
+    // Perna esquerda (traseira)
     ctx.fillRect(-8, 2 - legOffset * 0.4, 5, 12);
-    // Perna direita
+    // Perna direita (dianteira)
     ctx.fillRect(3, 2 + legOffset * 0.4 + (isKicking ? -4 : 0), 5, 12);
 
     // Tênis (All Star / Chuteira de Futsal)
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(-10, 12 - legOffset * 0.4, 7, 5);
     ctx.fillRect(3, 12 + legOffset * 0.4 + (isKicking ? -4 : 0), 7, 5);
+    // Detalhe de sola/faixa vermelha no tênis
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(-9, 15 - legOffset * 0.4, 6, 2);
+    ctx.fillRect(4, 15 + legOffset * 0.4 + (isKicking ? -4 : 0), 6, 2);
 
     // Bermuda Jeans ou Calção de Time
     ctx.fillStyle = this.shortsColor;
@@ -1166,11 +1271,21 @@ class Player {
     ctx.roundRect(-10, -18, 20, 18, [4, 4, 0, 0]);
     ctx.fill();
 
-    // Número da camisa nas costas/frente
+    // Faixa esportiva lateral na camisa
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.fillRect(-10, -18, 3, 18);
+
+    // Número da camisa
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 8px Outfit';
     ctx.textAlign = 'center';
-    ctx.fillText(this.number, 0, -8);
+    if (isFacingUp) {
+      // Costas
+      ctx.fillText(this.number, 0, -8);
+    } else {
+      // Frente / Peito
+      ctx.fillText(this.number, 2, -8);
+    }
 
     // Cabeça
     ctx.fillStyle = this.skinTone;
@@ -1178,8 +1293,22 @@ class Player {
     ctx.arc(0, -24, 7.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cabelo / Boné do Cria
-    this.drawHair(ctx);
+    // Rosto (olhos focados de cria e sorriso) quando de frente/diagonal
+    if (!isFacingUp) {
+      ctx.fillStyle = '#1c1917';
+      ctx.fillRect(2, -26, 2, 2.5);
+      if (!isDiagonal) {
+        ctx.fillRect(-3, -26, 2, 2.5);
+      }
+      ctx.strokeStyle = '#5c3826';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(2, -22, 2, 0.2, Math.PI * 0.8);
+      ctx.stroke();
+    }
+
+    // Cabelo / Boné do Cria (orientado na diagonal)
+    this.drawHair(ctx, isFacingUp, isDiagonal);
 
     ctx.restore();
 
@@ -1194,7 +1323,7 @@ class Player {
     ctx.restore();
   }
 
-  drawHair(ctx) {
+  drawHair(ctx, isFacingUp = false, isDiagonal = false) {
     ctx.fillStyle = this.hairColor;
     if (this.hairStyle === 'afro') {
       ctx.beginPath();
@@ -1206,13 +1335,30 @@ class Player {
       ctx.beginPath();
       ctx.arc(0, -27, 8, Math.PI, Math.PI * 2);
       ctx.fill();
+      if (!isFacingUp) {
+        ctx.fillRect(0, -27, 6, 2.5);
+      }
     } else if (this.hairStyle === 'cap') {
-      // Boné virado pra trás
+      // Boné virado na diagonal com estilo de cria!
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
       ctx.arc(0, -27, 8, Math.PI * 0.8, Math.PI * 2.2);
       ctx.fill();
-      ctx.fillRect(-10, -26, 4, 3); // Aba virada
+      if (isFacingUp) {
+        // Visto de costas: aba virada pra trás
+        ctx.fillStyle = '#b91c1c';
+        ctx.fillRect(-9, -26, 6, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-2, -25, 4, 2); // Fecho snapback
+      } else {
+        // Visto de frente/diagonal: Aba estilizada na diagonal de cria
+        ctx.fillStyle = '#b91c1c';
+        ctx.save();
+        ctx.translate(4, -26);
+        ctx.rotate(isDiagonal ? 0.35 : 0.15); // Aba na diagonal
+        ctx.fillRect(0, -1, 7, 3.5);
+        ctx.restore();
+      }
     } else if (this.hairStyle === 'dreads') {
       // Dreads estilizados
       ctx.beginPath();
@@ -1220,6 +1366,9 @@ class Player {
       ctx.fill();
       ctx.fillRect(-7, -26, 3, 8);
       ctx.fillRect(4, -26, 3, 8);
+      if (isFacingUp) {
+        ctx.fillRect(-2, -26, 3, 9);
+      }
     } else {
       // Cabelo raspado / buzz
       ctx.beginPath();
@@ -1238,125 +1387,156 @@ class Player {
 class FavelaScenery {
   constructor() {
     this.windTime = 0;
-    // Torcida nas lajes e sacadas ao redor de toda a quadra
+    this.smokeTime = 0;
+
+    // Torcida animada distribuída pelas lajes, sacadas e calçadas ao redor de toda a quadra
     this.fans = [
-      // Fundo (Topo da Quadra)
-      { x: 160, y: 130, color: '#facc15', hair: '#111', bobSpeed: 3.5, jump: 0 },
-      { x: 230, y: 125, color: '#ef4444', hair: '#fef08a', bobSpeed: 4.1, jump: 0 },
-      { x: 340, y: 135, color: '#10b981', hair: '#3b82f6', bobSpeed: 2.8, jump: 0 },
-      { x: 500, y: 120, color: '#8b5cf6', hair: '#111', bobSpeed: 3.2, jump: 0 },
-      { x: 620, y: 128, color: '#f59e0b', hair: '#fef08a', bobSpeed: 3.9, jump: 0 },
-      { x: 780, y: 125, color: '#ec4899', hair: '#fff', bobSpeed: 4.5, jump: 0 },
-      { x: 920, y: 132, color: '#38bdf8', hair: '#111', bobSpeed: 3.0, jump: 0 },
-      { x: 1040, y: 122, color: '#f97316', hair: '#fef08a', bobSpeed: 3.8, jump: 0 },
-      // Lado Esquerdo (atrás do gol esquerdo)
-      { x: 45, y: 220, color: '#10b981', hair: '#111', bobSpeed: 3.1, jump: 0 },
-      { x: 80, y: 250, color: '#facc15', hair: '#38bdf8', bobSpeed: 4.0, jump: 0 },
-      { x: 55, y: 560, color: '#ef4444', hair: '#fef08a', bobSpeed: 3.4, jump: 0 },
-      // Lado Direito (atrás do gol direito)
-      { x: 1220, y: 220, color: '#38bdf8', hair: '#fef08a', bobSpeed: 3.7, jump: 0 },
-      { x: 1255, y: 260, color: '#ec4899', hair: '#111', bobSpeed: 2.9, jump: 0 },
-      { x: 1230, y: 550, color: '#facc15', hair: '#111', bobSpeed: 4.2, jump: 0 }
+      // Fundo - Lajes Superiores
+      { x: -80, y: 125, color: '#facc15', hair: '#111', bobSpeed: 3.4, jump: 0 },
+      { x: 30, y: 130, color: '#ef4444', hair: '#fef08a', bobSpeed: 4.1, jump: 0 },
+      { x: 160, y: 125, color: '#10b981', hair: '#111', bobSpeed: 3.2, jump: 0 },
+      { x: 230, y: 120, color: '#facc15', hair: '#fef08a', bobSpeed: 4.3, jump: 0 },
+      { x: 340, y: 132, color: '#3b82f6', hair: '#38bdf8', bobSpeed: 2.9, jump: 0 },
+      { x: 440, y: 124, color: '#ec4899', hair: '#111', bobSpeed: 3.7, jump: 0 },
+      { x: 520, y: 118, color: '#f59e0b', hair: '#fef08a', bobSpeed: 4.0, jump: 0 },
+      { x: 620, y: 126, color: '#8b5cf6', hair: '#111', bobSpeed: 3.5, jump: 0 },
+      { x: 740, y: 122, color: '#ef4444', hair: '#fff', bobSpeed: 4.4, jump: 0 },
+      { x: 840, y: 128, color: '#facc15', hair: '#111', bobSpeed: 3.1, jump: 0 },
+      { x: 940, y: 122, color: '#38bdf8', hair: '#fef08a', bobSpeed: 3.8, jump: 0 },
+      { x: 1040, y: 126, color: '#10b981', hair: '#111', bobSpeed: 4.2, jump: 0 },
+      { x: 1130, y: 120, color: '#f97316', hair: '#fef08a', bobSpeed: 3.6, jump: 0 },
+      { x: 1260, y: 128, color: '#ec4899', hair: '#111', bobSpeed: 4.1, jump: 0 },
+      { x: 1380, y: 124, color: '#facc15', hair: '#fef08a', bobSpeed: 3.3, jump: 0 },
+
+      // Lado Esquerdo - Sacadas e Escadão
+      { x: 35, y: 230, color: '#10b981', hair: '#111', bobSpeed: 3.2, jump: 0 },
+      { x: 80, y: 270, color: '#facc15', hair: '#38bdf8', bobSpeed: 4.1, jump: 0 },
+      { x: 45, y: 410, color: '#ef4444', hair: '#fef08a', bobSpeed: 3.5, jump: 0 },
+      { x: 85, y: 560, color: '#38bdf8', hair: '#111', bobSpeed: 4.0, jump: 0 },
+
+      // Lado Direito - Lajes e Viela
+      { x: 1215, y: 230, color: '#38bdf8', hair: '#fef08a', bobSpeed: 3.7, jump: 0 },
+      { x: 1265, y: 280, color: '#ec4899', hair: '#111', bobSpeed: 3.0, jump: 0 },
+      { x: 1220, y: 420, color: '#facc15', hair: '#111', bobSpeed: 4.3, jump: 0 },
+      { x: 1260, y: 570, color: '#10b981', hair: '#fef08a', bobSpeed: 3.6, jump: 0 },
+
+      // Calçada Inferior - Espectadores apoiados na mureta
+      { x: 210, y: 702, color: '#facc15', hair: '#111', bobSpeed: 2.8, jump: 0 },
+      { x: 410, y: 704, color: '#ef4444', hair: '#fef08a', bobSpeed: 3.4, jump: 0 },
+      { x: 610, y: 702, color: '#38bdf8', hair: '#111', bobSpeed: 3.2, jump: 0 },
+      { x: 830, y: 703, color: '#10b981', hair: '#111', bobSpeed: 3.9, jump: 0 },
+      { x: 1050, y: 702, color: '#f59e0b', hair: '#fef08a', bobSpeed: 3.5, jump: 0 }
     ];
   }
 
   update() {
-    this.windTime += 0.05;
+    this.windTime += 0.04;
+    this.smokeTime += 0.05;
     for (const fan of this.fans) {
       fan.jump = Math.sin(this.windTime * fan.bobSpeed) * 3;
     }
   }
 
   draw(ctx, width, height) {
-    // 1. Céu Tropical de Dia Ensolarado com Sol, Nuvens e Pipas
-    this.drawSkyAndSun(ctx, width, height);
+    // 1. Céu Tropical Panorâmico de Dia Ensolarado com Sol, Nuvens e Pipas
+    this.drawSkyAndSun(ctx);
 
-    // 2. Morro Denso ao Fundo com Centenas de Casinhas de Favela
+    // 2. Morro Denso ao Fundo com Centenas de Casinhas de Favela, Vegetação e Bandeira
     this.drawFarHill(ctx);
 
-    // 3. Casas de Tijolo e Lajes no Meio-Cenário (Fundo)
+    // 3. Casas de Tijolo e Lajes no Meio-Cenário (Fundo da Quadra)
     this.drawMidHouses(ctx);
 
-    // 4. Fios de Poste e Roupas no Varal ao Vento
+    // 4. Fios de Poste com Tênis Pendurados e Roupas no Varal ao Vento
     this.drawWiresAndLaundry(ctx);
 
-    // 5. Torcida nas Lajes
+    // 5. Torcida nas Lajes e Sacadas
     this.drawCrowd(ctx);
 
-    // 6. Muro dos Fundos com Grafites
+    // 6. Muro dos Fundos com Grafites e Alambrado de Proteção
     this.drawGraffitiWall(ctx);
 
     // 7. Quadra de Cimento Iluminada de Dia
     this.drawCourt(ctx);
 
-    // 8. LADO ESQUERDO DA QUADRA (Casas empilhadas, Boteco com toldo, Escadão)
+    // 8. LADO ESQUERDO DA QUADRA (Casas, Boteco com toldo, Churrasqueira com fumaça, Escadão)
     this.drawLeftSideFavela(ctx);
 
-    // 9. LADO DIREITO DA QUADRA (Casas, Viela, Motoca dos crias, Antena)
+    // 9. LADO DIREITO DA QUADRA (Casas, Viela dos Crias, Motos estacionadas, Paredão de Som)
     this.drawRightSideFavela(ctx);
 
-    // 10. PARTE INFERIOR (Calçada, Cadeiras de boteco, Isopor, Vira-lata Caramelo, Bike)
+    // 10. PARTE INFERIOR (Calçada completa, Cadeiras de boteco, Isopor, Vira-lata Caramelo, Bike, Carrinho de picolé)
     this.drawBottomFavela(ctx);
 
     // 11. Traves e Redes dos Gols
     this.drawGoals(ctx);
   }
 
-  drawSkyAndSun(ctx, width, height) {
+  drawSkyAndSun(ctx) {
     ctx.save();
-    // Céu azul tropical de dia ensolarado
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, WORLD.courtTop);
+    const minX = -600;
+    const maxX = 1900;
+    const minY = -400;
+    const topY = WORLD.courtTop;
+    const fullW = maxX - minX;
+
+    // Céu azul tropical vibrante cobrindo toda a extensão panorâmica
+    const skyGrad = ctx.createLinearGradient(0, minY, 0, topY);
     skyGrad.addColorStop(0, '#0284c7');   // Azul celeste profundo
-    skyGrad.addColorStop(0.5, '#38bdf8'); // Azul céu vibrante
+    skyGrad.addColorStop(0.55, '#38bdf8'); // Azul céu vibrante
     skyGrad.addColorStop(1, '#bae6fd');   // Haze claro do horizonte ensolarado
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, width, WORLD.courtTop);
+    ctx.fillRect(minX, minY, fullW, topY - minY);
 
-    // Sol Brilhante de Meio-Dia
+    // Sol Brilhante de Meio-Dia Tropical
     const sunX = 960;
-    const sunY = 60;
+    const sunY = 55;
 
-    // Raios suaves do sol
-    ctx.strokeStyle = 'rgba(254, 240, 138, 0.22)';
-    ctx.lineWidth = 3;
+    // Raios suaves do sol girando suavemente
+    ctx.strokeStyle = 'rgba(254, 240, 138, 0.25)';
+    ctx.lineWidth = 3.5;
     for (let i = 0; i < 8; i++) {
       const a = (i * Math.PI * 2) / 8 + this.windTime * 0.05;
       ctx.beginPath();
-      ctx.moveTo(sunX + Math.cos(a) * 35, sunY + Math.sin(a) * 35);
-      ctx.lineTo(sunX + Math.cos(a) * 75, sunY + Math.sin(a) * 75);
+      ctx.moveTo(sunX + Math.cos(a) * 36, sunY + Math.sin(a) * 36);
+      ctx.lineTo(sunX + Math.cos(a) * 80, sunY + Math.sin(a) * 80);
       ctx.stroke();
     }
 
     // Brilho e núcleo do Sol
-    const sunGrad = ctx.createRadialGradient(sunX, sunY, 12, sunX, sunY, 65);
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 12, sunX, sunY, 70);
     sunGrad.addColorStop(0, '#ffffff');
     sunGrad.addColorStop(0.3, '#fef08a');
-    sunGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.35)');
+    sunGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.38)');
     sunGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = sunGrad;
     ctx.beginPath();
-    ctx.arc(sunX, sunY, 65, 0, Math.PI * 2);
+    ctx.arc(sunX, sunY, 70, 0, Math.PI * 2);
     ctx.fill();
 
-    // Nuvens Brancas de Verão
-    this.drawCloud(ctx, (120 + this.windTime * 4) % (WORLD.width + 160) - 80, 40, 48);
-    this.drawCloud(ctx, (540 + this.windTime * 3) % (WORLD.width + 160) - 80, 55, 60);
-    this.drawCloud(ctx, (980 + this.windTime * 3.5) % (WORLD.width + 160) - 80, 32, 52);
+    // Nuvens Brancas de Verão Deslizando
+    this.drawCloud(ctx, ((-200 + this.windTime * 5) % (fullW + 300)) + minX, 40, 56);
+    this.drawCloud(ctx, ((180 + this.windTime * 4.2) % (fullW + 300)) + minX, 55, 64);
+    this.drawCloud(ctx, ((620 + this.windTime * 3.8) % (fullW + 300)) + minX, 35, 58);
+    this.drawCloud(ctx, ((1080 + this.windTime * 4.5) % (fullW + 300)) + minX, 60, 68);
+    this.drawCloud(ctx, ((1520 + this.windTime * 3.5) % (fullW + 300)) + minX, 42, 54);
 
-    // Pipas de Combate no Céu (clássico da favela brasileira)
-    this.drawKite(ctx, 310, 45 + Math.sin(this.windTime * 2) * 8, '#ef4444', '#facc15');
-    this.drawKite(ctx, 730, 35 + Math.sin(this.windTime * 1.8 + 1) * 7, '#0284c7', '#ffffff');
+    // Pipas de Combate no Céu (clássico do céu da quebrada)
+    this.drawKite(ctx, 180, 48 + Math.sin(this.windTime * 2.2) * 8, '#facc15', '#10b981');
+    this.drawKite(ctx, 420, 36 + Math.sin(this.windTime * 1.9 + 1) * 7, '#ef4444', '#facc15');
+    this.drawKite(ctx, 780, 42 + Math.sin(this.windTime * 2.1 + 2) * 9, '#0284c7', '#ffffff');
+    this.drawKite(ctx, 1180, 34 + Math.sin(this.windTime * 1.8 + 3) * 6, '#ec4899', '#fef08a');
 
     ctx.restore();
   }
 
   drawCloud(ctx, x, y, size) {
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
     ctx.beginPath();
     ctx.arc(x, y, size * 0.45, 0, Math.PI * 2);
-    ctx.arc(x + size * 0.35, y - size * 0.15, size * 0.4, 0, Math.PI * 2);
-    ctx.arc(x + size * 0.7, y, size * 0.38, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.35, y - size * 0.16, size * 0.42, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.72, y, size * 0.38, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -1369,107 +1549,176 @@ class FavelaScenery {
     // Losango da Pipa
     ctx.fillStyle = color1;
     ctx.beginPath();
-    ctx.moveTo(0, -12);
-    ctx.lineTo(9, 0);
-    ctx.lineTo(0, 14);
-    ctx.lineTo(-9, 0);
+    ctx.moveTo(0, -13);
+    ctx.lineTo(10, 0);
+    ctx.lineTo(0, 15);
+    ctx.lineTo(-10, 0);
     ctx.closePath();
     ctx.fill();
 
     // Faixa central contrastante
     ctx.fillStyle = color2;
     ctx.beginPath();
-    ctx.moveTo(-9, 0);
-    ctx.lineTo(0, 4);
-    ctx.lineTo(9, 0);
-    ctx.lineTo(0, -4);
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(0, 5);
+    ctx.lineTo(10, 0);
+    ctx.lineTo(0, -5);
     ctx.closePath();
     ctx.fill();
 
-    // Vareta
-    ctx.strokeStyle = '#333';
+    // Vareta central e envergação
+    ctx.strokeStyle = '#222';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, -12);
-    ctx.lineTo(0, 14);
+    ctx.moveTo(0, -13);
+    ctx.lineTo(0, 15);
     ctx.stroke();
 
     // Rabiola ondulando ao vento
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.moveTo(0, 14);
-    for (let i = 1; i <= 5; i++) {
-      const rx = Math.sin(this.windTime * 4 + i) * 6;
-      const ry = 14 + i * 8;
+    ctx.moveTo(0, 15);
+    for (let i = 1; i <= 6; i++) {
+      const rx = Math.sin(this.windTime * 4 + i) * 7;
+      const ry = 15 + i * 9;
       ctx.lineTo(rx, ry);
     }
     ctx.stroke();
+
+    // Lacinhos coloridos da rabiola
+    const laceColors = [color1, color2, '#ffffff'];
+    for (let i = 1; i <= 5; i++) {
+      const rx = Math.sin(this.windTime * 4 + i) * 7;
+      const ry = 15 + i * 9;
+      ctx.fillStyle = laceColors[i % laceColors.length];
+      ctx.fillRect(rx - 3, ry - 1, 6, 2.5);
+    }
 
     ctx.restore();
   }
 
   drawFarHill(ctx) {
     ctx.save();
-    // Morro Verdejante com Formações Rochosas Tropicais
-    ctx.fillStyle = '#15803d'; // Verde floresta tropical
+    const minX = -600;
+    const maxX = 1900;
+
+    // 1. Morros distantes de Mata Atlântica (verde profundo)
+    ctx.fillStyle = '#14532d';
     ctx.beginPath();
-    ctx.moveTo(0, 155);
-    ctx.bezierCurveTo(280, 65, 680, 35, 1300, 110);
-    ctx.lineTo(1300, WORLD.courtTop);
-    ctx.lineTo(0, WORLD.courtTop);
+    ctx.moveTo(minX, 160);
+    ctx.bezierCurveTo(-200, 50, 400, 30, 1000, 70);
+    ctx.bezierCurveTo(1350, 95, 1650, 45, maxX, 110);
+    ctx.lineTo(maxX, WORLD.courtTop);
+    ctx.lineTo(minX, WORLD.courtTop);
     ctx.closePath();
     ctx.fill();
 
-    // Manchas de rocha e árvores no morro
-    ctx.fillStyle = '#166534';
+    // 2. Camada intermediária de morro mais próxima
+    ctx.fillStyle = '#15803d';
     ctx.beginPath();
-    ctx.arc(380, 95, 38, 0, Math.PI * 2);
-    ctx.arc(680, 80, 45, 0, Math.PI * 2);
-    ctx.arc(1020, 110, 40, 0, Math.PI * 2);
+    ctx.moveTo(minX, 165);
+    ctx.bezierCurveTo(-150, 80, 350, 55, 850, 95);
+    ctx.bezierCurveTo(1200, 120, 1600, 75, maxX, 135);
+    ctx.lineTo(maxX, WORLD.courtTop);
+    ctx.lineTo(minX, WORLD.courtTop);
+    ctx.closePath();
     ctx.fill();
 
-    // Centenas de Casinhas de Favela Empilhadas no Morro
-    const houseColors = ['#ea580c', '#c2410c', '#d97706', '#9a3412', '#cbd5e1', '#b45309'];
-    for (let i = 0; i < 75; i++) {
-      const hx = 40 + i * 17 + (i % 4) * 4;
-      const hy = 65 + Math.sin(i * 0.38) * 28 + (i % 3) * 14;
+    // Manchas de vegetação tropical e rochas
+    ctx.fillStyle = '#166534';
+    for (let rx = -500; rx <= 1800; rx += 180) {
+      ctx.beginPath();
+      ctx.arc(rx, 90 + Math.sin(rx * 0.01) * 20, 36, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. Comunidade de Favela Gigante: mais de 160 casinhas empilhadas no morro
+    const houseColors = ['#ea580c', '#c2410c', '#d97706', '#9a3412', '#cbd5e1', '#b45309', '#e2e8f0', '#78350f'];
+    for (let i = 0; i < 165; i++) {
+      const hx = -520 + i * 14 + (i % 5) * 3;
+      const hy = 62 + Math.sin(i * 0.35) * 30 + (i % 3) * 16;
       const color = houseColors[i % houseColors.length];
 
-      // Casinha de tijolo
+      // Casinha de tijolo baiano/reboco
       ctx.fillStyle = color;
-      ctx.fillRect(hx, hy, 15, 16);
+      ctx.fillRect(hx, hy, 16, 17);
 
       // Telhado de amianto cinza
       ctx.fillStyle = '#64748b';
-      ctx.fillRect(hx - 1, hy - 2, 17, 3);
+      ctx.fillRect(hx - 1, hy - 2, 18, 3.5);
 
-      // Caixa d'água azul miniatura no topo
+      // Caixa d'água azul Fortlev miniatura
       if (i % 2 === 0) {
         ctx.fillStyle = '#0284c7';
-        ctx.fillRect(hx + 3, hy - 6, 6, 4);
+        ctx.fillRect(hx + 3, hy - 7, 7, 5);
       }
 
-      // Janelinha
+      // Janelinha com luz/sombra
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(hx + 3, hy + 5, 3, 4);
+      ctx.fillRect(hx + 4, hy + 5, 3.5, 4.5);
     }
+
+    // Bandeira do Brasil tremulando em um mastro alto no topo da favela
+    const flagPoleX = 480;
+    const flagPoleY = 40;
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(flagPoleX, flagPoleY + 45);
+    ctx.lineTo(flagPoleX, flagPoleY);
+    ctx.stroke();
+
+    // Bandeira verde, amarela e azul
+    const wave = Math.sin(this.windTime * 4) * 3;
+    ctx.fillStyle = '#15803d'; // Verde
+    ctx.beginPath();
+    ctx.moveTo(flagPoleX, flagPoleY);
+    ctx.lineTo(flagPoleX + 24, flagPoleY + wave);
+    ctx.lineTo(flagPoleX + 24, flagPoleY + 15 + wave);
+    ctx.lineTo(flagPoleX, flagPoleY + 15);
+    ctx.closePath();
+    ctx.fill();
+
+    // Losango amarelo
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.moveTo(flagPoleX + 4, flagPoleY + 7.5 + wave * 0.3);
+    ctx.lineTo(flagPoleX + 12, flagPoleY + 2 + wave * 0.5);
+    ctx.lineTo(flagPoleX + 20, flagPoleY + 7.5 + wave * 0.8);
+    ctx.lineTo(flagPoleX + 12, flagPoleY + 13 + wave * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Círculo azul
+    ctx.fillStyle = '#0284c7';
+    ctx.beginPath();
+    ctx.arc(flagPoleX + 12, flagPoleY + 7.5 + wave * 0.5, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 
   drawMidHouses(ctx) {
     ctx.save();
-    // Casas de Tijolo Baiano, Concreto e Lajes Grandes no Fundo da Quadra
+    // Casas de Tijolo Baiano, Concreto e Lajes Grandes em toda a extensão do fundo da quadra
     const houses = [
-      { x: 10, w: 120, h: 95, color: '#c2410c', tank: true },
-      { x: 135, w: 140, h: 105, color: '#ea580c', tank: true },
-      { x: 280, w: 125, h: 88, color: '#9a3412', tank: false },
-      { x: 410, w: 150, h: 110, color: '#b45309', tank: true },
-      { x: 565, w: 135, h: 92, color: '#ea580c', tank: false },
-      { x: 705, w: 145, h: 108, color: '#c2410c', tank: true },
-      { x: 855, w: 130, h: 90, color: '#9a3412', tank: false },
-      { x: 990, w: 155, h: 115, color: '#ea580c', tank: true },
-      { x: 1150, w: 140, h: 100, color: '#b45309', tank: true }
+      { x: -520, w: 135, h: 98, color: '#c2410c', tank: true },
+      { x: -375, w: 140, h: 105, color: '#ea580c', tank: true },
+      { x: -225, w: 125, h: 90, color: '#9a3412', tank: false },
+      { x: -90, w: 130, h: 110, color: '#b45309', tank: true },
+      { x: 50, w: 140, h: 102, color: '#ea580c', tank: true },
+      { x: 200, w: 125, h: 92, color: '#c2410c', tank: false },
+      { x: 335, w: 145, h: 112, color: '#b45309', tank: true },
+      { x: 490, w: 130, h: 95, color: '#ea580c', tank: false },
+      { x: 630, w: 150, h: 108, color: '#c2410c', tank: true },
+      { x: 790, w: 135, h: 94, color: '#9a3412', tank: false },
+      { x: 935, w: 150, h: 115, color: '#ea580c', tank: true },
+      { x: 1095, w: 140, h: 100, color: '#b45309', tank: true },
+      { x: 1245, w: 135, h: 96, color: '#c2410c', tank: false },
+      { x: 1390, w: 145, h: 106, color: '#ea580c', tank: true },
+      { x: 1545, w: 140, h: 98, color: '#b45309', tank: true },
+      { x: 1695, w: 150, h: 110, color: '#9a3412', tank: false }
     ];
 
     for (const h of houses) {
@@ -1479,12 +1728,12 @@ class FavelaScenery {
       ctx.fillStyle = h.color;
       ctx.fillRect(h.x, topY, h.w, h.h);
 
-      // Vigas e pilares de concreto
+      // Vigas e pilares de concreto cinza
       ctx.fillStyle = '#78716c';
       ctx.fillRect(h.x + 6, topY - 14, 8, 14);
       ctx.fillRect(h.x + h.w - 14, topY - 14, 8, 14);
 
-      // Ferros da laje expostos (clássico da favela)
+      // Ferros da laje expostos (vergalhões de espera)
       ctx.strokeStyle = '#44403c';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -1494,51 +1743,67 @@ class FavelaScenery {
       ctx.lineTo(h.x + h.w - 11, topY - 26);
       ctx.stroke();
 
-      // Caixa d'água azul Fortlev
+      // Caixa d'água azul Fortlev com tampa
       if (h.tank) {
         ctx.fillStyle = '#0284c7';
         ctx.beginPath();
-        ctx.roundRect(h.x + h.w / 2 - 15, topY - 20, 30, 20, [4, 4, 0, 0]);
+        ctx.roundRect(h.x + h.w / 2 - 16, topY - 21, 32, 21, [4, 4, 0, 0]);
         ctx.fill();
         ctx.fillStyle = '#0369a1';
-        ctx.fillRect(h.x + h.w / 2 - 17, topY - 23, 34, 4); // Tampa
+        ctx.fillRect(h.x + h.w / 2 - 18, topY - 24, 36, 4); // Tampa
       }
 
-      // Janelas de alumínio e cortinas coloridas
+      // Janelas de alumínio com cortinas coloridas
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(h.x + 18, topY + 22, 22, 26);
-      ctx.fillRect(h.x + h.w - 40, topY + 22, 22, 26);
-      // Cortina
-      ctx.fillStyle = '#facc15';
-      ctx.fillRect(h.x + 18, topY + 22, 8, 26);
+      ctx.fillRect(h.x + 16, topY + 22, 22, 26);
+      ctx.fillRect(h.x + h.w - 38, topY + 22, 22, 26);
+      // Cortinas coloridas
+      ctx.fillStyle = (h.x % 2 === 0) ? '#facc15' : '#ef4444';
+      ctx.fillRect(h.x + 16, topY + 22, 8, 26);
     }
     ctx.restore();
   }
 
   drawWiresAndLaundry(ctx) {
     ctx.save();
-    // Fios de postes e emaranhado clássico de fiação
+    // Emaranhado clássico de fiação elétrica de alta e baixa tensão
     ctx.strokeStyle = '#18181b';
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = 1.7;
 
     ctx.beginPath();
-    ctx.moveTo(0, 60);
-    ctx.bezierCurveTo(380, 115, 780, 110, 1300, 70);
-    ctx.moveTo(0, 85);
-    ctx.bezierCurveTo(450, 140, 880, 130, 1300, 95);
+    ctx.moveTo(-600, 50);
+    ctx.bezierCurveTo(-150, 110, 450, 115, 1050, 65);
+    ctx.bezierCurveTo(1350, 40, 1650, 90, 1900, 60);
+
+    ctx.moveTo(-600, 80);
+    ctx.bezierCurveTo(-100, 140, 520, 135, 1120, 85);
+    ctx.bezierCurveTo(1400, 60, 1700, 110, 1900, 85);
+
     ctx.moveTo(180, 80);
     ctx.lineTo(420, 160);
+    ctx.moveTo(750, 85);
+    ctx.lineTo(1020, 165);
     ctx.stroke();
 
-    // Roupas no Varal Fluttering ao Vento
+    // O CLÁSSICO TÊNIS AMARRADO NO FIO DE ALTA TENSÃO (Ícone da favela brasileira)
+    this.drawHangingSneakers(ctx, 360, 108);
+    this.drawHangingSneakers(ctx, 890, 104);
+
+    // Roupas no Varal Fluttering ao Vento nas Lajes
     const clothes = [
-      { x: 260, y: 122, color: '#facc15', w: 14, h: 18 },
-      { x: 285, y: 123, color: '#ffffff', w: 12, h: 20 },
-      { x: 308, y: 124, color: '#ef4444', w: 16, h: 16 },
+      { x: -140, y: 122, color: '#facc15', w: 14, h: 18 },
+      { x: -115, y: 124, color: '#ffffff', w: 13, h: 20 },
+      { x: 90, y: 122, color: '#10b981', w: 15, h: 18 },
+      { x: 115, y: 124, color: '#ffffff', w: 13, h: 22 },
+      { x: 270, y: 122, color: '#facc15', w: 14, h: 18 },
+      { x: 295, y: 123, color: '#ffffff', w: 12, h: 20 },
+      { x: 318, y: 124, color: '#ef4444', w: 16, h: 16 },
       { x: 670, y: 122, color: '#10b981', w: 15, h: 18 },
       { x: 695, y: 124, color: '#ffffff', w: 13, h: 22 },
       { x: 720, y: 121, color: '#38bdf8', w: 15, h: 17 },
-      { x: 885, y: 123, color: '#f43f5e', w: 14, h: 18 }
+      { x: 885, y: 123, color: '#f43f5e', w: 14, h: 18 },
+      { x: 1150, y: 122, color: '#facc15', w: 14, h: 18 },
+      { x: 1175, y: 124, color: '#38bdf8', w: 15, h: 20 }
     ];
 
     for (const c of clothes) {
@@ -1550,6 +1815,39 @@ class FavelaScenery {
       ctx.fillRect(-c.w / 2, 0, c.w, c.h);
       ctx.restore();
     }
+    ctx.restore();
+  }
+
+  drawHangingSneakers(ctx, x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    const swing = Math.sin(this.windTime * 2.5 + x) * 0.08;
+    ctx.rotate(swing);
+
+    // Cadarço pendurado no fio
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-4, 14);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(4, 18);
+    ctx.stroke();
+
+    // Tênis 1 (esquerdo)
+    ctx.fillStyle = '#dc2626'; // Vermelho clássico All Star
+    ctx.fillRect(-9, 14, 9, 6);
+    ctx.fillStyle = '#ffffff'; // Biqueira branca
+    ctx.fillRect(-10, 17, 3, 3);
+    ctx.fillRect(-9, 19, 9, 2);
+
+    // Tênis 2 (direito)
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(1, 18, 9, 6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(8, 21, 3, 3);
+    ctx.fillRect(1, 23, 9, 2);
+
     ctx.restore();
   }
 
@@ -1565,12 +1863,12 @@ class FavelaScenery {
       ctx.beginPath();
       ctx.arc(fan.x, fy, 6, 0, Math.PI * 2);
       ctx.fill();
-      // Cabelo
+      // Cabelo ou boné
       ctx.fillStyle = fan.hair;
       ctx.beginPath();
       ctx.arc(fan.x, fy - 2, 6, Math.PI, Math.PI * 2);
       ctx.fill();
-      // Braços vibrando
+      // Braços vibrando e comemorando
       ctx.strokeStyle = fan.color;
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -1585,94 +1883,149 @@ class FavelaScenery {
 
   drawGraffitiWall(ctx) {
     ctx.save();
-    const wallY = WORLD.courtTop - 35;
-    const wallH = 35;
+    const wallY = WORLD.courtTop - 36;
+    const wallH = 36;
+    const startX = WORLD.courtLeft - 40;
+    const endX = WORLD.courtRight + 40;
+    const wallW = endX - startX;
 
     // Muro de Concreto do Fundo
     ctx.fillStyle = '#334155';
-    ctx.fillRect(WORLD.courtLeft, wallY, WORLD.courtRight - WORLD.courtLeft, wallH);
+    ctx.fillRect(startX, wallY, wallW, wallH);
 
-    // Grafites de Rua
+    // Grafites de Rua Estilizados
     ctx.font = 'bold 16px "Permanent Marker", cursive';
     ctx.fillStyle = '#facc15';
-    ctx.fillText('É O BEIÇO ⚡', 240, wallY + 24);
+    ctx.fillText('É O BEIÇO ⚡', 220, wallY + 24);
 
     ctx.fillStyle = '#ff0055';
-    ctx.fillText('FAVELA VENCE!', 520, wallY + 24);
+    ctx.fillText('FAVELA VENCE!', 500, wallY + 24);
 
     ctx.fillStyle = '#10b981';
-    ctx.fillText('RUA 10 ⚽', 850, wallY + 24);
+    ctx.fillText('RUA 10 ⚽', 820, wallY + 24);
 
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('SÓ OS CRIA', 1010, wallY + 24);
+    ctx.fillText('SÓ OS CRIA', 990, wallY + 24);
 
-    // Gradil / Mureta de proteção
+    // Alambrado / Grade Metálica de Proteção
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 2;
-    for (let x = WORLD.courtLeft; x <= WORLD.courtRight; x += 30) {
+    for (let x = startX; x <= endX; x += 28) {
       ctx.beginPath();
       ctx.moveTo(x, wallY);
-      ctx.lineTo(x, wallY - 16);
+      ctx.lineTo(x, wallY - 18);
       ctx.stroke();
     }
     ctx.beginPath();
-    ctx.moveTo(WORLD.courtLeft, wallY - 16);
-    ctx.lineTo(WORLD.courtRight, wallY - 16);
+    ctx.moveTo(startX, wallY - 18);
+    ctx.lineTo(endX, wallY - 18);
     ctx.stroke();
 
     ctx.restore();
   }
 
   // ====================================================================
-  // LADO ESQUERDO DA QUADRA (Casas empilhadas, Boteco com toldo, Escadão)
+  // LADO ESQUERDO DA QUADRA (Casas empilhadas, Boteco com toldo, Churrasqueira com fumaça, Escadão)
   // ====================================================================
   drawLeftSideFavela(ctx) {
     ctx.save();
     const leftW = WORLD.courtLeft; // 120px de largura lateral
 
-    // Casas empilhadas de tijolo e concreto subindo à esquerda
+    // Casas empilhadas de tijolo e concreto subindo à esquerda (estende até -600)
     ctx.fillStyle = '#c2410c';
-    ctx.fillRect(0, 160, leftW, 530);
+    ctx.fillRect(-600, 160, 600 + leftW, 530);
 
-    // Divisórias de andares e lajes
+    // Fachadas de casas adjacentes com cores variadas
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(-450, 160, 220, 530);
+    ctx.fillStyle = '#9a3412';
+    ctx.fillRect(-220, 160, 210, 530);
+
+    // Divisórias de andares e lajes de concreto
     ctx.fillStyle = '#78716c';
-    ctx.fillRect(0, 310, leftW, 10);
-    ctx.fillRect(0, 480, leftW, 10);
+    ctx.fillRect(-600, 310, 600 + leftW, 12);
+    ctx.fillRect(-600, 480, 600 + leftW, 12);
 
-    // Janelas com grades
+    // Janelas com grades em todos os andares
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(20, 200, 35, 45);
-    ctx.fillRect(70, 200, 35, 45);
-    ctx.fillRect(20, 340, 35, 45);
-    ctx.fillRect(70, 340, 35, 45);
+    ctx.fillRect(18, 200, 35, 45);
+    ctx.fillRect(68, 200, 35, 45);
+    ctx.fillRect(18, 340, 35, 45);
+    ctx.fillRect(68, 340, 35, 45);
 
-    // Caixa d'água no topo esquerdo
+    // Caixas d'água no topo esquerdo
     ctx.fillStyle = '#0284c7';
-    ctx.fillRect(25, 140, 40, 22);
+    ctx.fillRect(25, 138, 44, 22);
+    ctx.fillRect(-120, 138, 42, 22);
 
     // BOTECO DA ESQUINA (com toldo listrado vermelho e amarelo)
     const botecoY = 500;
-    // Toldo listrado
-    const stripes = ['#ef4444', '#facc15', '#ef4444', '#facc15', '#ef4444', '#facc15'];
+    const stripes = ['#ef4444', '#facc15', '#ef4444', '#facc15', '#ef4444', '#facc15', '#ef4444', '#facc15'];
     for (let i = 0; i < stripes.length; i++) {
       ctx.fillStyle = stripes[i];
-      ctx.fillRect(i * 18, botecoY, 18, 22);
+      ctx.fillRect(i * 15 - 10, botecoY, 15, 24);
     }
-    // Balcão de madeira
+
+    // Balcão de madeira do Boteco
     ctx.fillStyle = '#78350f';
-    ctx.fillRect(10, botecoY + 22, 95, 30);
+    ctx.fillRect(0, botecoY + 24, 105, 30);
     // Letreiro do Boteco
-    ctx.font = 'bold 9px Outfit';
+    ctx.font = 'bold 10px Outfit';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('BOTECO DO ZÉ', 16, botecoY + 38);
+    ctx.fillText('BOTECO DO ZÉ', 12, botecoY + 42);
 
-    // Escadão da favela subindo à esquerda
-    ctx.fillStyle = '#57534e';
+    // Engradados de cerveja amarelos e vermelhos empilhados
+    ctx.fillStyle = '#facc15';
+    ctx.fillRect(10, botecoY + 54, 24, 16);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(36, botecoY + 54, 24, 16);
+
+    // CHURRASQUEIRA DE LATÃO NA CALÇADA SOLTANDO FUMACINHA
+    const grillX = 82;
+    const grillY = botecoY + 50;
+
+    // Tambor de ferro
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(grillX, grillY, 24, 18);
+    // Pés de ferro
+    ctx.strokeStyle = '#71717a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(grillX + 3, grillY + 18);
+    ctx.lineTo(grillX - 1, grillY + 28);
+    ctx.moveTo(grillX + 21, grillY + 18);
+    ctx.lineTo(grillX + 25, grillY + 28);
+    ctx.stroke();
+
+    // Brasas vermelhas e espetinhos assando
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(grillX + 2, grillY + 1, 20, 3);
+    ctx.fillStyle = '#78350f';
+    ctx.fillRect(grillX + 4, grillY - 2, 16, 2.5); // Espetinho
+
+    // Fumaça cinza suave subindo proceduralmente da churrasqueira
+    ctx.save();
+    for (let p = 0; p < 4; p++) {
+      const prog = (this.smokeTime * 0.8 + p * 0.25) % 1.0;
+      const smX = grillX + 12 + Math.sin(this.smokeTime * 3 + p) * (prog * 18);
+      const smY = grillY - (prog * 45);
+      const smR = 4 + prog * 10;
+      const alpha = (1.0 - prog) * 0.35;
+      ctx.fillStyle = `rgba(220, 225, 235, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(smX, smY, smR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Escadão da favela subindo à esquerda com degraus pintados
+    const stepColors = ['#0284c7', '#facc15', '#ef4444', '#10b981', '#f97316', '#8b5cf6'];
     for (let s = 0; s < 6; s++) {
-      ctx.fillRect(5, 600 + s * 10, 60 - s * 5, 8);
+      ctx.fillStyle = stepColors[s % stepColors.length];
+      ctx.fillRect(4, 610 + s * 10, 65 - s * 5, 8);
     }
 
-    // Grafite lateral
+    // Grafite vertical na parede esquerda
     ctx.font = 'bold 15px "Permanent Marker", cursive';
     ctx.fillStyle = '#facc15';
     ctx.save();
@@ -1685,21 +2038,26 @@ class FavelaScenery {
   }
 
   // ====================================================================
-  // LADO DIREITO DA QUADRA (Casas, Viela, Motoca dos crias, Antena)
+  // LADO DIREITO DA QUADRA (Casas, Viela dos Crias, Motos estacionadas, Paredão de Som)
   // ====================================================================
   drawRightSideFavela(ctx) {
     ctx.save();
     const rightX = WORLD.courtRight; // 1180px
     const rightW = WORLD.width - rightX; // 120px
 
-    // Edificações de tijolo e reboco à direita
+    // Edificações de tijolo e reboco à direita (estendendo até 1900)
     ctx.fillStyle = '#ea580c';
-    ctx.fillRect(rightX, 160, rightW, 530);
+    ctx.fillRect(rightX, 160, 800, 530);
+
+    ctx.fillStyle = '#c2410c';
+    ctx.fillRect(rightX + 160, 160, 260, 530);
+    ctx.fillStyle = '#9a3412';
+    ctx.fillRect(rightX + 430, 160, 300, 530);
 
     // Lajes intermediárias de concreto
     ctx.fillStyle = '#78716c';
-    ctx.fillRect(rightX, 300, rightW, 10);
-    ctx.fillRect(rightX, 470, rightW, 10);
+    ctx.fillRect(rightX, 300, 800, 12);
+    ctx.fillRect(rightX, 470, 800, 12);
 
     // Janelas
     ctx.fillStyle = '#1e293b';
@@ -1710,40 +2068,40 @@ class FavelaScenery {
 
     // Caixa d'água no topo direito
     ctx.fillStyle = '#0284c7';
-    ctx.fillRect(rightX + 45, 140, 42, 22);
+    ctx.fillRect(rightX + 45, 138, 44, 22);
 
     // Antena Parabólica espinha de peixe
     ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.moveTo(rightX + 80, 160);
-    ctx.lineTo(rightX + 80, 120);
+    ctx.lineTo(rightX + 80, 118);
     for (let r = 0; r < 4; r++) {
-      ctx.moveTo(rightX + 70 + r * 5, 125 + r * 6);
-      ctx.lineTo(rightX + 90 - r * 5, 125 + r * 6);
+      ctx.moveTo(rightX + 70 + r * 5, 124 + r * 6);
+      ctx.lineTo(rightX + 90 - r * 5, 124 + r * 6);
     }
     ctx.stroke();
 
-    // VIELA / BECO DA QUEBRADA COM MOTOCA ESTACIONADA (HONDA CG 160)
-    const motoY = 540;
-    const motoX = rightX + 35;
+    // VIELA / BECO DA QUEBRADA COM MOTOCAS ESTACIONADAS NO GRAU
+    const motoY = 560;
+    const motoX = rightX + 28;
 
     // Sombra da moto
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
     ctx.beginPath();
-    ctx.ellipse(motoX + 22, motoY + 28, 26, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(motoX + 24, motoY + 28, 28, 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Rodas da moto
+    // Rodas da CG 160
     ctx.fillStyle = '#18181b';
     ctx.beginPath();
     ctx.arc(motoX + 6, motoY + 24, 9, 0, Math.PI * 2);
-    ctx.arc(motoX + 40, motoY + 24, 9, 0, Math.PI * 2);
+    ctx.arc(motoX + 42, motoY + 24, 9, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#94a3b8';
     ctx.beginPath();
     ctx.arc(motoX + 6, motoY + 24, 4, 0, Math.PI * 2);
-    ctx.arc(motoX + 40, motoY + 24, 4, 0, Math.PI * 2);
+    ctx.arc(motoX + 42, motoY + 24, 4, 0, Math.PI * 2);
     ctx.fill();
 
     // Quadro e escapamento cromado
@@ -1751,18 +2109,18 @@ class FavelaScenery {
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(motoX + 16, motoY + 24);
-    ctx.lineTo(motoX + 38, motoY + 26);
+    ctx.lineTo(motoX + 40, motoY + 26);
     ctx.stroke();
 
-    // Tanque Vermelho da CG 160
+    // Tanque Vermelho da Titan 160
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.roundRect(motoX + 16, motoY + 10, 16, 9, [4, 6, 2, 2]);
+    ctx.roundRect(motoX + 16, motoY + 10, 18, 9, [4, 6, 2, 2]);
     ctx.fill();
 
     // Banco preto e guidão
     ctx.fillStyle = '#111827';
-    ctx.fillRect(motoX + 26, motoY + 11, 14, 5);
+    ctx.fillRect(motoX + 28, motoY + 11, 14, 5);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1770,11 +2128,41 @@ class FavelaScenery {
     ctx.lineTo(motoX + 10, motoY + 4);
     ctx.stroke();
 
+    // PAREDÃO DE SOM AUTOMOTIVO DA QUEBRADA
+    const soundY = 485;
+    const soundX = rightX + 68;
+
+    // Estrutura das caixas de som pretas empilhadas
+    ctx.fillStyle = '#18181b';
+    ctx.fillRect(soundX, soundY, 44, 48);
+
+    // Alto-falantes graves (woofers) com LEDs brilhantes pulsando
+    const pulse = 0.5 + Math.sin(this.windTime * 8) * 0.5;
+    ctx.fillStyle = '#27272a';
+    ctx.beginPath();
+    ctx.arc(soundX + 14, soundY + 16, 9, 0, Math.PI * 2);
+    ctx.arc(soundX + 32, soundY + 16, 9, 0, Math.PI * 2);
+    ctx.arc(soundX + 22, soundY + 36, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Anéis de LED azuis e vermelhos brilhando
+    ctx.strokeStyle = `rgba(56, 189, 248, ${0.4 + pulse * 0.5})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(soundX + 14, soundY + 16, 9, 0, Math.PI * 2);
+    ctx.arc(soundX + 32, soundY + 16, 9, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulse * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(soundX + 22, soundY + 36, 11, 0, Math.PI * 2);
+    ctx.stroke();
+
     // Grafite vertical na parede direita
     ctx.font = 'bold 15px "Permanent Marker", cursive';
     ctx.fillStyle = '#00ff88';
     ctx.save();
-    ctx.translate(rightX + 12, 420);
+    ctx.translate(rightX + 14, 420);
     ctx.rotate(Math.PI / 2);
     ctx.fillText('RUA 10 ⚽', 0, 0);
     ctx.restore();
@@ -1783,45 +2171,51 @@ class FavelaScenery {
   }
 
   // ====================================================================
-  // PARTE INFERIOR (Calçada, Cadeiras de boteco, Isopor, Vira-lata Caramelo)
+  // PARTE INFERIOR (Calçada completa, Cadeiras de boteco, Isopor, Vira-lata Caramelo, Bike, Carrinho de picolé)
   // ====================================================================
   drawBottomFavela(ctx) {
     ctx.save();
     const botY = WORLD.courtBottom; // 680px
-    const botH = WORLD.height - botY; // 80px
+    const botH = 280; // Estende bem para baixo da tela
 
-    // Calçada de cimento e meio-fio
+    // Calçada de cimento panorâmica
     ctx.fillStyle = '#475569';
-    ctx.fillRect(0, botY, WORLD.width, botH);
+    ctx.fillRect(-600, botY, 2500, botH);
 
     // Meio-fio de concreto pintado de amarelo/cinza
     ctx.fillStyle = '#cbd5e1';
-    ctx.fillRect(0, botY, WORLD.width, 5);
+    ctx.fillRect(-600, botY, 2500, 6);
 
-    // Mureta de contenção com grafites
+    // Mureta de contenção com grafites de rua
     ctx.fillStyle = '#334155';
-    ctx.fillRect(0, botY + 45, WORLD.width, botH - 45);
+    ctx.fillRect(-600, botY + 48, 2500, botH - 48);
 
     // Grafites na mureta inferior
     ctx.font = 'bold 14px "Permanent Marker", cursive';
     ctx.fillStyle = '#facc15';
-    ctx.fillText('⚽ QUEBRADA UNIDA', 180, botY + 68);
+    ctx.fillText('⚽ QUEBRADA UNIDA', 180, botY + 70);
     ctx.fillStyle = '#38bdf8';
-    ctx.fillText('★ SÓ OS CRIA DA GROTA ★', 540, botY + 68);
+    ctx.fillText('★ SÓ OS CRIA DA GROTA ★', 540, botY + 70);
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('RESPEITA A FAVELA ⚡', 920, botY + 68);
+    ctx.fillText('RESPEITA A FAVELA ⚡', 920, botY + 70);
 
-    // Cadeiras de Plástico de Boteco (Amarela e Vermelha)
-    this.drawPlasticChair(ctx, 280, botY + 12, '#facc15');
-    this.drawPlasticChair(ctx, 310, botY + 12, '#ef4444');
+    // Cadeiras de Plástico de Boteco (Amarela Skol e Vermelha Brahma)
+    this.drawPlasticChair(ctx, 270, botY + 12, '#facc15');
+    this.drawPlasticChair(ctx, 305, botY + 12, '#ef4444');
     this.drawPlasticChair(ctx, 890, botY + 12, '#ef4444');
-    this.drawPlasticChair(ctx, 920, botY + 12, '#facc15');
+    this.drawPlasticChair(ctx, 925, botY + 12, '#facc15');
+
+    // Mesinha de plástico com garrafas e latinhas
+    ctx.fillStyle = '#facc15';
+    ctx.fillRect(288, botY + 16, 16, 12);
+    ctx.fillStyle = '#10b981'; // Garrafa de Guaraná/Heineken
+    ctx.fillRect(293, botY + 10, 4, 7);
 
     // Caixa de Isopor Branca com Latinhas e Gelo
     ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(345, botY + 18, 28, 18);
+    ctx.fillRect(345, botY + 18, 30, 20);
     ctx.fillStyle = '#0284c7';
-    ctx.fillRect(344, botY + 16, 30, 4); // Tampa azul
+    ctx.fillRect(344, botY + 16, 32, 4); // Tampa azul
 
     // O CLÁSSICO CACHORRO VIRA-LATA CARAMELO DEITADO NO SOL
     const dogX = 720;
@@ -1830,18 +2224,18 @@ class FavelaScenery {
     // Sombra do caramelo
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.beginPath();
-    ctx.ellipse(dogX + 12, dogY + 12, 18, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(dogX + 12, dogY + 12, 19, 6.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Corpo caramelo
     ctx.fillStyle = '#d97706'; // Amarelo queimado/caramelo
     ctx.beginPath();
-    ctx.roundRect(dogX, dogY, 24, 11, [6, 6, 4, 4]);
+    ctx.roundRect(dogX, dogY, 25, 12, [6, 6, 4, 4]);
     ctx.fill();
 
     // Cabeça do cão
     ctx.beginPath();
-    ctx.arc(dogX - 3, dogY + 3, 6, 0, Math.PI * 2);
+    ctx.arc(dogX - 3, dogY + 3, 6.5, 0, Math.PI * 2);
     ctx.fill();
     // Orelha caída
     ctx.fillStyle = '#b45309';
@@ -1859,9 +2253,28 @@ class FavelaScenery {
     ctx.strokeStyle = '#d97706';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(dogX + 22, dogY + 4);
-    ctx.lineTo(dogX + 29, dogY + 2 + tailWag);
+    ctx.moveTo(dogX + 23, dogY + 4);
+    ctx.lineTo(dogX + 30, dogY + 2 + tailWag);
     ctx.stroke();
+
+    // Potinho de água do caramelo
+    ctx.fillStyle = '#0284c7';
+    ctx.fillRect(dogX - 16, dogY + 8, 8, 5);
+
+    // Gatinho preto e branco equilibrado na mureta
+    const catX = 660;
+    const catY = botY + 42;
+    ctx.fillStyle = '#18181b';
+    ctx.beginPath();
+    ctx.ellipse(catX, catY, 9, 5, 0, 0, Math.PI * 2);
+    ctx.arc(catX - 6, catY - 2, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Orelhinhas pontudas
+    ctx.beginPath();
+    ctx.moveTo(catX - 8, catY - 5);
+    ctx.lineTo(catX - 6, catY - 9);
+    ctx.lineTo(catX - 4, catY - 5);
+    ctx.fill();
 
     // Bicicletinha aro 20 encostada no muro
     const bikeX = 460;
@@ -1880,6 +2293,30 @@ class FavelaScenery {
     ctx.lineTo(bikeX + 26, bikeY + 14);
     ctx.moveTo(bikeX + 12, bikeY + 6);
     ctx.lineTo(bikeX + 8, bikeY + 2); // guidão
+    ctx.stroke();
+
+    // Carrinho de Picolé do Zeca com guarda-sol colorido
+    const cartX = 140;
+    const cartY = botY + 16;
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(cartX, cartY, 26, 18);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(cartX + 3, cartY + 18, 7, 7); // Rodinha
+    ctx.fillRect(cartX + 16, cartY + 18, 7, 7);
+    // Guarda-sol do carrinho
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(cartX + 13, cartY - 8, 16, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0284c7';
+    ctx.beginPath();
+    ctx.arc(cartX + 13, cartY - 8, 10, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#71717a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cartX + 13, cartY - 8);
+    ctx.lineTo(cartX + 13, cartY);
     ctx.stroke();
 
     ctx.restore();
@@ -1952,17 +2389,17 @@ class FavelaScenery {
     ctx.arc(midX, midY, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pequenas Áreas / Linhas de Pênalti
+    // Pequenas Áreas / Linhas de Pênalti (Proporcionais ao novo gol ampliado)
     // Lado Esquerdo
-    ctx.strokeRect(cl, midY - 110, 110, 220);
+    ctx.strokeRect(cl, midY - 145, 125, 290);
     ctx.beginPath();
-    ctx.arc(cl + 80, midY, 4, 0, Math.PI * 2);
+    ctx.arc(cl + 90, midY, 4, 0, Math.PI * 2);
     ctx.fill();
 
     // Lado Direito
-    ctx.strokeRect(cr - 110, midY - 110, 110, 220);
+    ctx.strokeRect(cr - 125, midY - 145, 125, 290);
     ctx.beginPath();
-    ctx.arc(cr - 80, midY, 4, 0, Math.PI * 2);
+    ctx.arc(cr - 90, midY, 4, 0, Math.PI * 2);
     ctx.fill();
 
     // Marcações de spray no chão: "BEIÇO STREET"
@@ -2256,11 +2693,14 @@ class GameEngine {
 
   initInputListeners() {
     window.addEventListener('keydown', (e) => {
-      // Ignorar teclas repetidas
       this.keys[e.code] = true;
+      if (e.key) {
+        this.keys[e.key.toLowerCase()] = true;
+        this.keys[e.key] = true;
+      }
 
       // Impedir que espaço e setas rolem a página
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) || [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
       }
 
@@ -2270,6 +2710,14 @@ class GameEngine {
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
+      if (e.key) {
+        this.keys[e.key.toLowerCase()] = false;
+        this.keys[e.key] = false;
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      this.keys = {};
     });
   }
 
@@ -2355,7 +2803,7 @@ class GameEngine {
       p2.isControlled = false;
       p2.controlId = null;
       this.p2PowerHud.classList.add('hidden');
-      document.getElementById('hud-match-hint').textContent = 'P1: [W A S D + ESPAÇO]';
+      document.getElementById('hud-match-hint').textContent = 'P1: [WASD ou SETAS + ESPAÇO]';
     }
 
     // Esconder menus e mostrar HUD
@@ -2389,18 +2837,16 @@ class GameEngine {
       if (isGo) {
         this.triggerShake(6);
         audio.playWhistle(false);
+        this.state = 'PLAYING';
+        this.startTimerInterval();
+        setTimeout(() => {
+          this.countdownBanner.classList.add('hidden');
+        }, 500);
+        return;
       }
 
       step++;
-      if (step < counts.length) {
-        setTimeout(tick, 800);
-      } else {
-        setTimeout(() => {
-          this.countdownBanner.classList.add('hidden');
-          this.state = 'PLAYING';
-          this.startTimerInterval();
-        }, 600);
-      }
+      setTimeout(tick, 800);
     };
 
     tick();
@@ -2566,47 +3012,71 @@ class GameEngine {
     // Atualização do cenário (vento, torcida)
     this.scenery.update();
 
-    // Atualização dos jogadores
     const p1 = this.players[0];
     const p2 = this.players[2];
 
-    for (const player of this.players) {
-      player.update(this.keys, this.ball, this.players, this.particles);
-    }
+    // No estado COUNTDOWN, todos devem permanecer 100% parados em seus lugares
+    if (this.state === 'COUNTDOWN') {
+      for (const player of this.players) {
+        player.x = player.homeX;
+        player.y = player.homeY;
+        player.vx = 0;
+        player.vy = 0;
+        player.walkCycle = 0;
+        player.isChargingKick = false;
+        player.kickCharge = 0;
+        player.kickAnimTimer = 0;
+        player.kickCooldown = 0;
+        player.conductionTimer = 0;
+        player.facingAngle = player.team === 'beico' ? 0 : Math.PI;
+      }
+      this.ball.x = WORLD.width / 2;
+      this.ball.y = (WORLD.courtTop + WORLD.courtBottom) / 2;
+      this.ball.vx = 0;
+      this.ball.vy = 0;
+      this.ball.vz = 0;
+      this.ball.z = 0;
+      this.ball.trail = [];
+    } else {
+      // Atualização dos jogadores
+      for (const player of this.players) {
+        player.update(this.keys, this.ball, this.players, this.particles);
+      }
 
-    // Colisão entre jogadores (não atravessam um ao outro)
-    for (let i = 0; i < this.players.length; i++) {
-      for (let j = i + 1; j < this.players.length; j++) {
-        const pA = this.players[i];
-        const pB = this.players[j];
-        const dx = pB.x - pA.x;
-        const dy = pB.y - pA.y;
-        const dist = Math.hypot(dx, dy);
-        const minDist = pA.radius + pB.radius;
-        if (dist < minDist && dist > 0) {
-          const overlap = (minDist - dist) / 2;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          pA.x -= nx * overlap;
-          pA.y -= ny * overlap;
-          pB.x += nx * overlap;
-          pB.y += ny * overlap;
+      // Colisão entre jogadores (não atravessam um ao outro)
+      for (let i = 0; i < this.players.length; i++) {
+        for (let j = i + 1; j < this.players.length; j++) {
+          const pA = this.players[i];
+          const pB = this.players[j];
+          const dx = pB.x - pA.x;
+          const dy = pB.y - pA.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = pA.radius + pB.radius;
+          if (dist < minDist && dist > 0) {
+            const overlap = (minDist - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            pA.x -= nx * overlap;
+            pA.y -= ny * overlap;
+            pB.x += nx * overlap;
+            pB.y += ny * overlap;
+          }
         }
       }
-    }
 
-    // Atualização da bola
-    this.ball.update(this.particles);
+      // Atualização da bola
+      this.ball.update(this.particles);
 
-    // Checagem de Gol
-    if (this.state === 'PLAYING') {
-      // Gol no lado esquerdo (Gol para os Rivais)
-      if (this.ball.x < WORLD.courtLeft - 10 && this.ball.y > WORLD.goalYTop && this.ball.y < WORLD.goalYBottom) {
-        this.triggerGoal('rivais');
-      }
-      // Gol no lado direito (Gol para o Beiço)
-      else if (this.ball.x > WORLD.courtRight + 10 && this.ball.y > WORLD.goalYTop && this.ball.y < WORLD.goalYBottom) {
-        this.triggerGoal('beico');
+      // Checagem de Gol
+      if (this.state === 'PLAYING') {
+        // Gol no lado esquerdo (Gol para os Rivais)
+        if (this.ball.x < WORLD.courtLeft - 10 && this.ball.y > WORLD.goalYTop && this.ball.y < WORLD.goalYBottom) {
+          this.triggerGoal('rivais');
+        }
+        // Gol no lado direito (Gol para o Beiço)
+        else if (this.ball.x > WORLD.courtRight + 10 && this.ball.y > WORLD.goalYTop && this.ball.y < WORLD.goalYBottom) {
+          this.triggerGoal('beico');
+        }
       }
     }
 

@@ -62,7 +62,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, #0284c7 0%, #0369a1 50%, #082f49 100%);
+  background-color: #0a0b10;
   overflow: hidden;
 }
 
