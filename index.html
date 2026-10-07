@@ -20,6 +20,11 @@
 
     <!-- HUD Durante a Partida -->
     <div id="hud" class="hud-layer hidden">
+      <!-- Selo de Fase do Torneio -->
+      <div id="tournament-stage-badge" class="tournament-stage-badge hidden">
+        <span id="tournament-stage-text">🏆 OITAVAS DE FINAL</span>
+      </div>
+
       <!-- Placar Superior Estilizado -->
       <div class="scoreboard-container">
         <div class="team-badge team-beico">
@@ -42,14 +47,14 @@
         <div class="team-badge team-rivais">
           <div class="team-score" id="score-rivais">0</div>
           <div class="team-meta">
-            <span class="team-name">RIVAIS</span>
-            <span class="team-sub">DO OUTRO LADO</span>
+            <span class="team-name" id="name-rivais">RIVAIS</span>
+            <span class="team-sub" id="sub-rivais">DO OUTRO LADO</span>
           </div>
-          <div class="team-logo">🔥</div>
+          <div class="team-logo" id="logo-rivais">🔥</div>
         </div>
       </div>
 
-      <!-- Barra de Chute P1 -->
+      <!-- Barra de Chute P1 com Sistema de Força -->
       <div id="p1-power-hud" class="power-hud p1-power">
         <div class="power-label">P1 FORÇA</div>
         <div class="power-bar-track">
@@ -77,7 +82,7 @@
 
       <!-- Feedback Flutuante de Jogador / Radar Mini -->
       <div class="bottom-hint">
-        <span id="hud-match-hint">P1: [WASD ou SETAS + ESPAÇO]</span>
+        <span id="hud-match-hint">P1: [WASD ou SETAS + SEGURE ESPAÇO/CLIQUE P/ FORÇA]</span>
       </div>
     </div>
 
@@ -85,6 +90,12 @@
     <div id="goal-banner" class="center-banner hidden">
       <div class="goal-text-glow">GOOOOOOOL!</div>
       <div id="goal-scorer" class="scorer-name">BEIÇO MANDOU PRO FUNDO DA REDE!</div>
+    </div>
+
+    <!-- Banner de Gol de Ouro (Morte Súbita com Tempo Infinito) -->
+    <div id="golden-goal-banner" class="center-banner hidden">
+      <div class="golden-goal-glow">⚡ GOL DE OURO! ⚡</div>
+      <div class="golden-goal-sub">TEMPO INFINITO — QUEM MARCAR O GOL VENCE O JOGO!</div>
     </div>
 
     <!-- Contagem Regressiva 3, 2, 1, JOGA! -->
@@ -118,12 +129,17 @@
         <div class="menu-buttons">
           <button id="btn-1player" class="btn-street btn-primary">
             <span class="btn-icon">⚽</span>
-            <span class="btn-text">1 JOGADOR <small>(CONTRA A IA)</small></span>
+            <span class="btn-text">1 JOGADOR <small>(1v1 AMISTOSO)</small></span>
           </button>
           
+          <button id="btn-tournament" class="btn-street btn-tournament">
+            <span class="btn-icon">🏆</span>
+            <span class="btn-text">MODO TORNEIO <small>(TAÇA DAS FAVELA)</small></span>
+          </button>
+
           <button id="btn-2players" class="btn-street btn-secondary">
             <span class="btn-icon">👥</span>
-            <span class="btn-text">2 JOGADORES <small>(MESMO TECLADO)</small></span>
+            <span class="btn-text">2 JOGADORES <small>(1v1 NO MESMO TECLADO)</small></span>
           </button>
           
           <button id="btn-how-to-play" class="btn-street btn-accent">
@@ -134,7 +150,7 @@
 
         <div class="menu-footer">
           <span class="audio-tip">🔊 Clique em qualquer botão para ativar o som arcade</span>
-          <span class="credits">Quadra da Grota • Clássico de Fim de Tarde</span>
+          <span class="credits">Quadra da Grota • 1v1 Estilo Beatball</span>
         </div>
       </div>
     </div>
@@ -143,7 +159,7 @@
     <div id="how-to-play-modal" class="overlay-screen hidden">
       <div class="modal-box">
         <div class="modal-header">
-          <h2 class="modal-title">COMO JOGAR NA QUEBRADA</h2>
+          <h2 class="modal-title">COMO JOGAR NA QUEBRADA (1v1)</h2>
           <button id="btn-close-how" class="btn-close" aria-label="Fechar">✕</button>
         </div>
 
@@ -161,17 +177,18 @@
                   <span class="key-cap">S</span>
                   <span class="key-cap">D</span>
                 </div>
-                <p class="key-desc">Mover Jogador</p>
+                <p class="key-desc">Mover Jogador (ou Setas no 1P)</p>
                 <div class="key-row">
                   <span class="key-cap key-space">ESPAÇO</span>
+                  <span class="key-cap">CLIQUE</span>
                 </div>
-                <p class="key-desc">Chutar / Roubar / Segurar p/ Chute Forte</p>
+                <p class="key-desc">Segure p/ Carregar Força, Solte p/ Chutar!</p>
               </div>
             </div>
 
             <!-- Jogador 2 -->
             <div class="control-card card-p2">
-              <div class="card-tag">JOGADOR 2 (RIVAIS)</div>
+              <div class="card-tag">JOGADOR 2 (CAVEIRA)</div>
               <div class="keys-display">
                 <div class="key-row">
                   <span class="key-cap">↑</span>
@@ -185,19 +202,18 @@
                 <div class="key-row">
                   <span class="key-cap key-enter">ENTER</span>
                 </div>
-                <p class="key-desc">Chutar / Roubar / Segurar p/ Chute Forte</p>
+                <p class="key-desc">Segure p/ Carregar Força, Solte p/ Chutar!</p>
               </div>
             </div>
           </div>
 
           <div class="tips-section">
-            <h3>DICAS DE RUA:</h3>
+            <h3>DICAS DE JOGO (1v1 FAVELA):</h3>
             <ul class="tips-list">
-              <li>⚡ <strong>Chute Carregado:</strong> Segure o botão de chute perto da bola para acumular força e soltar um foguete!</li>
-              <li>🤝 <strong>Passe do Bot:</strong> Seu companheiro bot toca automaticamente pra você ao recuperar a bola! Você também pode apertar ESPAÇO para chamar o passe.</li>
-              <li>🌀 <strong>Drible & Condução:</strong> Corra com a bola controlada nos pés e mude de direção para deixar o marcador na saudade.</li>
-              <li>🛡️ <strong>Dividida:</strong> Corra de encontro ao adversário com a posse para trombar e tomar a bola.</li>
-              <li>🧱 <strong>Tabela com a Parede:</strong> Chute a bola contra os muros de tijolo e latão para surpreender o goleiro!</li>
+              <li>⚡ <strong>Sistema de Força:</strong> Segure ESPAÇO ou CLIQUE DO MOUSE para carregar a barra e solte para disparar uma bomba! Toques rápidos dão chutes secos imediatos sem travar a bola.</li>
+              <li>🌀 <strong>Física Elástica & Rebote:</strong> Encoste na bola com o corpo para empurrar, conduzir e bloquear finalizações com pura física de colisão.</li>
+              <li>🛡️ <strong>Posicionamento 1v1:</strong> É 1 contra 1 sem goleiro! Fique na trajetória entre a bola e o seu gol para fechar os espaços.</li>
+              <li>🧱 <strong>Tabela com os Muros:</strong> Use as paredes da favela para desviar a bola ao redor do adversário e fazer golaços!</li>
             </ul>
           </div>
         </div>
@@ -208,12 +224,154 @@
       </div>
     </div>
 
-    <!-- TELA DE FIM DE JOGO -->
+    <!-- TELA DO MODO TORNEIO (CHAVEAMENTO E FASES) -->
+    <div id="tournament-modal" class="overlay-screen hidden">
+      <div class="tournament-box">
+        <div class="tournament-header">
+          <div class="tournament-header-title">
+            <span class="trophy-badge-icon">🏆</span>
+            <div>
+              <h2 class="modal-title">TAÇA DAS FAVELA 1v1</h2>
+              <p class="tournament-subtitle">Vença 4 partidas seguidas para levantar a Taça das Favela!</p>
+            </div>
+          </div>
+          <button id="btn-close-tournament" class="btn-close" aria-label="Fechar">✕</button>
+        </div>
+
+        <div class="tournament-body">
+          <!-- Trilha das 4 Fases (Oitavas, Quartas, Semis, Final) -->
+          <div class="tournament-bracket">
+            <div class="bracket-step step-current" id="bracket-step-0" data-round="0">
+              <div class="step-num">FASE 1</div>
+              <div class="step-badge">OITAVAS</div>
+              <div class="step-rival">
+                <span class="rival-avatar">⚽</span>
+                <span class="rival-name">Bielzinho #7</span>
+              </div>
+              <div class="step-diff">DIFICULDADE: <span class="diff-tag diff-easy">FÁCIL ⭐</span></div>
+              <div class="step-status status-current" id="bracket-status-0">ATUAL ⚔️</div>
+            </div>
+
+            <div class="bracket-arrow">➔</div>
+
+            <div class="bracket-step step-locked" id="bracket-step-1" data-round="1">
+              <div class="step-num">FASE 2</div>
+              <div class="step-badge">QUARTAS</div>
+              <div class="step-rival">
+                <span class="rival-avatar">⚡</span>
+                <span class="rival-name">Zica #11</span>
+              </div>
+              <div class="step-diff">DIFICULDADE: <span class="diff-tag diff-med">MÉDIA ⭐⭐</span></div>
+              <div class="step-status status-locked" id="bracket-status-1">BLOQUEADO 🔒</div>
+            </div>
+
+            <div class="bracket-arrow">➔</div>
+
+            <div class="bracket-step step-locked" id="bracket-step-2" data-round="2">
+              <div class="step-num">FASE 3</div>
+              <div class="step-badge">SEMIFINAL</div>
+              <div class="step-rival">
+                <span class="rival-avatar">🔥</span>
+                <span class="rival-name">Caveira #9</span>
+              </div>
+              <div class="step-diff">DIFICULDADE: <span class="diff-tag diff-hard">DIFÍCIL ⭐⭐⭐</span></div>
+              <div class="step-status status-locked" id="bracket-status-2">BLOQUEADO 🔒</div>
+            </div>
+
+            <div class="bracket-arrow">➔</div>
+
+            <div class="bracket-step step-locked step-final" id="bracket-step-3" data-round="3">
+              <div class="step-num">DECISÃO</div>
+              <div class="step-badge">FINAL 👑</div>
+              <div class="step-rival">
+                <span class="rival-avatar">👑</span>
+                <span class="rival-name">Gildásio #10</span>
+              </div>
+              <div class="step-diff">DIFICULDADE: <span class="diff-tag diff-boss">CHEFE ⭐⭐⭐⭐</span></div>
+              <div class="step-status status-locked" id="bracket-status-3">BLOQUEADO 🔒</div>
+            </div>
+          </div>
+
+          <!-- Card de Destaque do Confronto da Fase Atual -->
+          <div class="matchup-preview-card">
+            <div class="matchup-side matchup-p1">
+              <div class="matchup-avatar beico-avatar">⚡</div>
+              <div class="matchup-name">BEIÇO #10</div>
+              <div class="matchup-team">CRIAS DA VILA</div>
+            </div>
+
+            <div class="matchup-vs-badge">
+              <span>VS</span>
+            </div>
+
+            <div class="matchup-side matchup-rival">
+              <div class="matchup-avatar rival-avatar" id="matchup-rival-avatar">⚽</div>
+              <div class="matchup-name" id="matchup-rival-name">BIELZINHO #7</div>
+              <div class="matchup-team" id="matchup-rival-sub">CRIAS DO BECO</div>
+            </div>
+          </div>
+
+          <!-- Informações de Inteligência e Dificuldade da Fase -->
+          <div class="rival-intel-box">
+            <div class="intel-header">
+              <span class="intel-tag" id="intel-stage-tag">OITAVAS DE FINAL</span>
+              <span class="intel-stars" id="intel-stars">⭐ Dificuldade Fácil</span>
+            </div>
+            <p id="intel-desc" class="intel-desc">Bielzinho ainda está pegando o ritmo da quebrada. Chutes mais lentos e marcação frouxa. Hora de aquecer o pé!</p>
+          </div>
+        </div>
+
+        <div class="tournament-footer">
+          <button id="btn-start-tournament-match" class="btn-street btn-primary btn-play-round">
+            <span>⚽</span> <span id="btn-play-round-text">JOGAR OITAVAS DE FINAL</span>
+          </button>
+          <button id="btn-exit-tournament" class="btn-street btn-accent">
+            <span>🏠</span> VOLTAR AO MENU
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TELA DE RESULTADO DO TORNEIO (CLASSIFICADO / ELIMINADO / CAMPEÃO) -->
+    <div id="tournament-result-modal" class="overlay-screen hidden">
+      <div class="tournament-result-box">
+        <div id="tourney-result-badge" class="result-badge">CLASSIFICADO!</div>
+        <div id="tourney-result-icon" class="result-trophy-icon">🏆</div>
+        <h2 id="tourney-result-title" class="tourney-title">AVANÇOU PARA AS QUARTAS!</h2>
+        <p id="tourney-result-desc" class="tourney-desc">Você venceu e garantiu vaga na próxima fase da Taça das Favela!</p>
+
+        <div class="final-score-board tourney-score-board">
+          <div class="final-team">
+            <span class="team-name">BEIÇO</span>
+            <span id="tourney-score-beico" class="final-points">0</span>
+          </div>
+          <span class="final-vs">×</span>
+          <div class="final-team">
+            <span id="tourney-score-rival-name" class="team-name">RIVAL</span>
+            <span id="tourney-score-rival" class="final-points">0</span>
+          </div>
+        </div>
+
+        <div class="tourney-actions">
+          <button id="btn-tourney-next" class="btn-street btn-primary">
+            <span>🏆</span> <span id="btn-tourney-next-text">PRÓXIMA FASE (QUARTAS)</span>
+          </button>
+          <button id="btn-tourney-retry" class="btn-street btn-secondary hidden">
+            <span>🔄</span> TENTAR NOVAMENTE
+          </button>
+          <button id="btn-tourney-menu" class="btn-street btn-accent">
+            <span>🏠</span> MENU PRINCIPAL
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TELA DE FIM DE JOGO (AMISTOSO) -->
     <div id="game-over-screen" class="overlay-screen hidden">
       <div class="game-over-box">
         <div class="game-over-tag">APITO FINAL</div>
         <h2 id="game-over-title" class="game-over-title">É O BEIÇO!</h2>
-        <p id="game-over-subtitle" class="game-over-sub">A taça da quebrada fica em casa!</p>
+        <p id="game-over-subtitle" class="game-over-sub">A Taça das Favela fica em casa!</p>
 
         <div class="final-score-board">
           <div class="final-team">

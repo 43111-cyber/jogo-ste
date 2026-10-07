@@ -8,6 +8,9 @@
  * ====================================================================
  */
 
+// Instância do motor de jogo
+let game = null;
+
 // ====================================================================
 // 1. SISTEMA DE ÁUDIO PROCEDURAL (WEB AUDIO API)
 // ====================================================================
@@ -314,16 +317,131 @@ const WORLD = {
   courtRight: 1180,
   courtTop: 180,
   courtBottom: 680,
-  // Gols (Metragem e Profundidade - Gol aumentado para futebol de rua dinâmico)
-  goalYTop: 295,
-  goalYBottom: 565,
-  goalDepth: 60,
+  // Gols (Diminuído para 1v1 sem goleiro no estilo Beatball do Roblox)
+  goalYTop: 360,
+  goalYBottom: 500,
+  goalDepth: 55,
   postRadius: 6,
-  // Física da Bola (Mais rápida e fluida com bom rolamento)
-  ballRadius: 10,
-  friction: 0.962,
-  wallRestitution: 0.68
+  // Física da Bola (Mais rápida, com deslizamento fluido e quique elástico)
+  ballRadius: 11,
+  friction: 0.978,
+  wallRestitution: 0.80
 };
+
+// ====================================================================
+// 2.1 ESTRUTURA DO TORNEIO (OITAVAS, QUARTAS, SEMIS E FINAL)
+// Dificuldade progressiva calibrada por atributos e inteligência
+// ====================================================================
+const TOURNAMENT_ROUNDS = [
+  {
+    id: 'oitavas',
+    name: 'Oitavas de Final',
+    tag: 'FASE 1 / 4',
+    badge: '🏆 OITAVAS DE FINAL',
+    difficultyLabel: 'FÁCIL',
+    stars: '⭐',
+    description: 'Bielzinho ainda está pegando o ritmo da quebrada. Chutes mais lentos e marcação frouxa. Hora de aquecer o pé!',
+    opponent: {
+      name: 'Bielzinho #7',
+      shortName: 'BIELZINHO',
+      subName: 'CRIAS DO BECO',
+      team: 'rivais',
+      number: '7',
+      avatar: '⚽',
+      skinTone: '#b5784a',
+      shirtColor: '#f97316', // Laranja vibrante
+      shortsColor: '#ffffff',
+      hairStyle: 'buzz',
+      hairColor: '#171717',
+      speed: 1.15,
+      kickPowerMax: 10.5,
+      aiLeadFrames: 3,
+      aiAttackDist: 200,
+      kickPowerDefault: 0.65
+    }
+  },
+  {
+    id: 'quartas',
+    name: 'Quartas de Final',
+    tag: 'FASE 2 / 4',
+    badge: '🏆 QUARTAS DE FINAL',
+    difficultyLabel: 'MÉDIA',
+    stars: '⭐⭐',
+    description: 'Zica conhece os atalhos do cimento da favela. Tem boa velocidade, marca de perto e usa bem as paredes.',
+    opponent: {
+      name: 'Zica #11',
+      shortName: 'ZICA',
+      subName: 'TERRA DA PONTE',
+      team: 'rivais',
+      number: '11',
+      avatar: '⚡',
+      skinTone: '#5c3826',
+      shirtColor: '#10b981', // Verde esmeralda
+      shortsColor: '#0f172a',
+      hairStyle: 'dreads',
+      hairColor: '#0f172a',
+      speed: 1.30,
+      kickPowerMax: 12.5,
+      aiLeadFrames: 6,
+      aiAttackDist: 270,
+      kickPowerDefault: 0.80
+    }
+  },
+  {
+    id: 'semi',
+    name: 'Semifinais',
+    tag: 'FASE 3 / 4',
+    badge: '🏆 SEMIFINAL',
+    difficultyLabel: 'DIFÍCIL',
+    stars: '⭐⭐⭐',
+    description: 'Caveira é o artilheiro da ladeira. Chute pesado, bote agressivo e não perdoa na cara do gol. Jogo pegado!',
+    opponent: {
+      name: 'Caveira #9',
+      shortName: 'CAVEIRA',
+      subName: 'DO OUTRO LADO',
+      team: 'rivais',
+      number: '9',
+      avatar: '🔥',
+      skinTone: '#a16207',
+      shirtColor: '#ef4444', // Vermelho fogo
+      shortsColor: '#4338ca',
+      hairStyle: 'blonde',
+      hairColor: '#fef08a',
+      speed: 1.42,
+      kickPowerMax: 14.5,
+      aiLeadFrames: 9,
+      aiAttackDist: 340,
+      kickPowerDefault: 0.95
+    }
+  },
+  {
+    id: 'final',
+    name: 'Grande Final',
+    tag: 'DECISÃO DO TÍTULO',
+    badge: '👑 GRANDE FINAL',
+    difficultyLabel: 'CHEFE / LENDÁRIO',
+    stars: '⭐⭐⭐⭐ 👑',
+    description: 'Gildásio é o Rei do Asfalto. Velocidade máxima, reflexo imediato e bombas venenosas no ângulo. Valendo a taça!',
+    opponent: {
+      name: 'Gildásio #10',
+      shortName: 'GILDÁSIO',
+      subName: 'REI DO ASFALTO',
+      team: 'rivais',
+      number: '10',
+      avatar: '👑',
+      skinTone: '#78350f',
+      shirtColor: '#854d0e', // Dourado escuro / Preto real
+      shortsColor: '#18181b',
+      hairStyle: 'afro',
+      hairColor: '#eab308', // Dourado
+      speed: 1.55,
+      kickPowerMax: 14.5,
+      aiLeadFrames: 12,
+      aiAttackDist: 430,
+      kickPowerDefault: 1.0
+    }
+  }
+];
 
 // ====================================================================
 // 3. SISTEMA DE PARTÍCULAS E EFEITOS VISUAIS
@@ -517,12 +635,12 @@ class Ball {
       this.y = minY;
       this.vy = -this.vy * WORLD.wallRestitution;
       audio.playBounce();
-      game.triggerShake(3);
+      if (game) game.triggerShake(3);
     } else if (this.y > maxY) {
       this.y = maxY;
       this.vy = -this.vy * WORLD.wallRestitution;
       audio.playBounce();
-      game.triggerShake(3);
+      if (game) game.triggerShake(3);
     }
 
     // Colisão com as traves e redes dos gols
@@ -552,7 +670,7 @@ class Ball {
         this.x = minX;
         this.vx = -this.vx * WORLD.wallRestitution;
         audio.playBounce();
-        game.triggerShake(3);
+        if (game) game.triggerShake(3);
       }
     }
 
@@ -580,7 +698,7 @@ class Ball {
         this.x = maxX;
         this.vx = -this.vx * WORLD.wallRestitution;
         audio.playBounce();
-        game.triggerShake(3);
+        if (game) game.triggerShake(3);
       }
     }
 
@@ -608,7 +726,7 @@ class Ball {
         this.vx = (this.vx - 2 * dot * nx) * 0.85;
         this.vy = (this.vy - 2 * dot * ny) * 0.85;
         audio.playPost();
-        game.triggerShake(7);
+        if (game) game.triggerShake(7);
       }
     }
   }
@@ -684,7 +802,7 @@ class Player {
     this.team = config.team; // 'beico' ou 'rivais'
     this.isControlled = config.isControlled || false;
     this.controlId = config.controlId || 1; // 1 = P1 (WASD), 2 = P2 (SETAS)
-    this.role = config.role || 'striker'; // 'striker', 'defender', 'goalkeeper'
+    this.role = config.role || 'striker';
     this.homeX = config.homeX;
     this.homeY = config.homeY;
 
@@ -693,11 +811,17 @@ class Player {
     this.vx = 0;
     this.vy = 0;
     this.facingAngle = config.team === 'beico' ? 0 : Math.PI;
-    this.radius = 16;
-    this.speed = config.speed || 1.72; // Cadência mais lerda, controlada e precisa
-    this.kickPowerMax = 7.8; // Chute calibrado com a nova velocidade da bola
+    this.radius = 18; // Raio físico do jogador
+    this.speed = config.speed !== undefined ? config.speed : 1.40; // Cadenciado para o jogador ou calibrado por fase
+    this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 14.5;
+    this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 5.5;
 
-    // Visual / Aparência
+    // Atributos de Inteligência Artificial para o Torneio
+    this.aiLeadFrames = config.aiLeadFrames !== undefined ? config.aiLeadFrames : 8;
+    this.aiAttackDist = config.aiAttackDist !== undefined ? config.aiAttackDist : 260;
+    this.kickPowerDefault = config.kickPowerDefault !== undefined ? config.kickPowerDefault : 0.85;
+
+    // Visual / Aparência (100% mantido)
     this.skinTone = config.skinTone || '#8d5524';
     this.shirtColor = config.shirtColor || (config.team === 'beico' ? '#facc15' : '#ef4444');
     this.shortsColor = config.shortsColor || (config.team === 'beico' ? '#047857' : '#4338ca');
@@ -705,17 +829,16 @@ class Player {
     this.hairColor = config.hairColor || '#1c1917';
     this.number = config.number || '10';
 
-    // Animações
+    // Animações, Cooldowns e Sistema de Força
     this.walkCycle = 0;
     this.kickAnimTimer = 0;
-    this.kickCooldown = 0; // Cooldown de 1 segundo (60 frames)
+    this.kickCooldown = 0; // Cooldown anti-spam responsivo
     this.dribbleCooldown = 0;
-    this.tackleCooldown = 0;
 
-    // Chute Carregado e Condução
+    // Sistema de Força para Chutar
     this.isChargingKick = false;
     this.kickCharge = 0; // 0.0 a 1.0
-    this.conductionTimer = 0;
+    this.prevKickHeld = false;
   }
 
   reset() {
@@ -724,29 +847,31 @@ class Player {
     this.vx = 0;
     this.vy = 0;
     this.facingAngle = this.team === 'beico' ? 0 : Math.PI;
-    this.isChargingKick = false;
-    this.kickCharge = 0;
     this.kickAnimTimer = 0;
     this.kickCooldown = 0;
-    this.possessionTimer = 0;
-    this.conductionTimer = 0;
+    this.dribbleCooldown = 0;
+    this.isChargingKick = false;
+    this.kickCharge = 0;
+    this.prevKickHeld = false;
   }
 
   update(inputKeys, ball, players, particles) {
     let moveX = 0;
     let moveY = 0;
 
-    // 1. Controle Manual pelo Teclado com Suporte a Diagonais Fluidas
+    // 1. Controle Manual pelo Teclado / Mouse com Suporte a Diagonais Fluidas
     if (this.isControlled) {
-      const isSinglePlayer = (window.game && window.game.gameMode === '1P');
+      const isSinglePlayer = (window.game && (window.game.gameMode === '1P' || window.game.gameMode === 'TOURNAMENT'));
+      let isKickHeld = false;
+
       if (this.controlId === 1) {
-        // Player 1: W A S D (e também Setas se estiver jogando no modo 1 Jogador!)
+        // Player 1: W A S D (e também Setas se estiver no modo 1P)
         const up = !!(inputKeys['KeyW'] || inputKeys['w'] || inputKeys['W'] || (isSinglePlayer && (inputKeys['ArrowUp'] || inputKeys['arrowup'])));
         const down = !!(inputKeys['KeyS'] || inputKeys['s'] || inputKeys['S'] || (isSinglePlayer && (inputKeys['ArrowDown'] || inputKeys['arrowdown'])));
         const left = !!(inputKeys['KeyA'] || inputKeys['a'] || inputKeys['A'] || (isSinglePlayer && (inputKeys['ArrowLeft'] || inputKeys['arrowleft'])));
         const right = !!(inputKeys['KeyD'] || inputKeys['d'] || inputKeys['D'] || (isSinglePlayer && (inputKeys['ArrowRight'] || inputKeys['arrowright'])));
 
-        // Suporte direto para teclas diagonais no teclado numérico (7, 9, 1, 3)
+        // Suporte a teclas numéricas diagonais (7, 9, 1, 3)
         if (inputKeys['Numpad7'] || inputKeys['Home']) { moveY -= 1; moveX -= 1; }
         else if (inputKeys['Numpad9'] || inputKeys['PageUp']) { moveY -= 1; moveX += 1; }
         else if (inputKeys['Numpad1'] || inputKeys['End']) { moveY += 1; moveX -= 1; }
@@ -758,9 +883,9 @@ class Player {
           if (right) moveX += 1;
         }
 
-        // Chute P1 (Espaço, ou Enter/X no modo 1P)
-        const isKickDown = !!inputKeys['Space'] || (isSinglePlayer && (!!inputKeys['Enter'] || !!inputKeys['KeyX'] || !!inputKeys['x']));
-        this.handleKickButton(isKickDown, ball, players, particles);
+        // Chute P1: Segurar para carregar força (Espaço, Clique do Mouse, Enter ou X no 1P)
+        const isMouseDown = !!(window.game && window.game.mouseKick);
+        isKickHeld = !!(inputKeys['Space'] || inputKeys[' '] || isMouseDown || (isSinglePlayer && (inputKeys['Enter'] || inputKeys['KeyX'] || inputKeys['x'])));
 
       } else if (this.controlId === 2) {
         // Player 2: Setas + Enter
@@ -780,39 +905,45 @@ class Player {
           if (right) moveX += 1;
         }
 
-        // Chute P2 (Enter ou Numpad 0)
-        const isKickDown = !!inputKeys['Enter'] || !!inputKeys['Numpad0'];
-        this.handleKickButton(isKickDown, ball, players, particles);
+        // Chute P2: Segurar Enter ou Numpad0 para carregar força
+        isKickHeld = !!(inputKeys['Enter'] || inputKeys['Numpad0']);
       }
+
+      // Sistema de Força para Chutar (Hold to Charge, Release to Kick — sem bug de spam)
+      this.handleKickChargeSystem(isKickHeld, ball, particles);
+
     } else {
-      // 2. Inteligência Artificial (IA)
+      // 2. Inteligência Artificial (IA) 1v1 estilo Beatball
       const aiInput = this.computeAI(ball, players);
       moveX = aiInput.x;
       moveY = aiInput.y;
-      if (aiInput.wantPass && aiInput.passTarget) {
-        this.passTo(aiInput.passTarget, ball, particles);
-      } else if (aiInput.wantKick) {
-        this.executeInstantKick(ball, particles, aiInput.kickPower || 0.65);
+      if (aiInput.wantKick) {
+        this.executeInstantKick(ball, particles, aiInput.kickPower || 0.85);
       }
     }
 
-    // Normalização e física de movimento diagonal
+    // Normalização e movimentação lenta e controlada
     const len = Math.hypot(moveX, moveY);
     if (len > 0) {
       moveX /= len;
       moveY /= len;
       this.facingAngle = Math.atan2(moveY, moveX);
-      this.vx = moveX * this.speed;
-      this.vy = moveY * this.speed;
-      this.walkCycle += 0.11; // Animação cadenciada sincronizada com os passos
+      const targetVx = moveX * this.speed;
+      const targetVy = moveY * this.speed;
+      // Aceleração suave e cadência de passos sincronizada com velocidade lenta
+      this.vx += (targetVx - this.vx) * 0.28;
+      this.vy += (targetVy - this.vy) * 0.28;
+      this.walkCycle += 0.08; // Passos suaves e cadenciados
 
       // Soltar poeira do asfalto ao correr
-      if (Math.random() < 0.22) {
+      if (Math.random() < 0.12) {
         particles.addDust(this.x - moveX * 6, this.y + 12 - moveY * 3);
       }
     } else {
-      this.vx *= 0.6;
-      this.vy *= 0.6;
+      this.vx *= 0.65;
+      this.vy *= 0.65;
+      if (Math.abs(this.vx) < 0.05) this.vx = 0;
+      if (Math.abs(this.vy) < 0.05) this.vy = 0;
       this.walkCycle = 0;
     }
 
@@ -826,357 +957,254 @@ class Player {
 
     // Decréscimo de cooldowns
     if (this.kickCooldown > 0) this.kickCooldown--;
-    if (this.dribbleCooldown > 0) this.dribbleCooldown--;
-    if (this.tackleCooldown > 0) this.tackleCooldown--;
     if (this.kickAnimTimer > 0) this.kickAnimTimer--;
+    if (this.dribbleCooldown > 0) this.dribbleCooldown--;
 
-    // Interação com a Bola (condução e empurrãozinho leve)
+    // Interação com a Bola (física pura de corpo)
     this.handleBallContact(ball, particles);
   }
 
-  // Lógica de segurar para carregar chute e pedir passe
-  handleKickButton(isKeyDown, ball, players, particles) {
-    if (this.kickCooldown > 0) {
-      this.isChargingKick = false;
-      this.kickCharge = 0;
-      return;
-    }
-
-    const distToBall = Math.hypot(ball.x - this.x, ball.y - this.y);
-    const inBallRange = distToBall <= (this.radius + ball.radius + 24);
-
-    if (isKeyDown) {
-      if (inBallRange) {
-        // Perto da bola: carrega o chute
+  // Sistema de Força: Segure para carregar, solte para chutar (elimina 100% o bug de spam e bola parada)
+  handleKickChargeSystem(isKickHeld, ball, particles) {
+    if (isKickHeld) {
+      // Se não estiver em cooldown, carrega a força do chute continuamente
+      if (this.kickCooldown <= 0) {
         this.isChargingKick = true;
-        this.kickCharge = Math.min(1.0, this.kickCharge + 0.035);
-      } else {
-        // Longe da bola apertou o botão: pede passe pro companheiro bot ("Toca pra mim!")
-        const botTeammate = players && players.find(p => p.team === this.team && p !== this && !p.isControlled);
-        if (botTeammate) {
-          const distBot = Math.hypot(ball.x - botTeammate.x, ball.y - botTeammate.y);
-          if (distBot < botTeammate.radius + ball.radius + 26) {
-            botTeammate.passTo(this, ball, particles);
-          }
+        this.kickCharge = Math.min(1.0, this.kickCharge + 0.030); // ~0.55s para 100% de carga
+
+        // Poeira e vibração de energia nos pés acumulando força
+        if (this.kickCharge > 0.35 && Math.random() < 0.32) {
+          particles.addDust(this.x, this.y + 10, 'rgba(250, 204, 21, 0.55)', 1);
         }
       }
-    } else if (this.isChargingKick) {
-      // Soltou o botão: dispara o chute!
-      this.executeKick(ball, particles);
-      this.isChargingKick = false;
-      this.kickCharge = 0;
+    } else {
+      // Soltou o botão / clique: se estava carregando, dispara a bomba!
+      if (this.isChargingKick || this.kickCharge > 0) {
+        this.executeChargedKick(ball, particles);
+        this.isChargingKick = false;
+        this.kickCharge = 0;
+      }
+    }
+
+    this.prevKickHeld = isKickHeld;
+  }
+
+  // Dispara o chute carregado
+  executeChargedKick(ball, particles) {
+    if (this.kickCooldown > 0) return;
+
+    const dx = ball.x - this.x;
+    const dy = ball.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    const kickRange = this.radius + ball.radius + 24;
+
+    const chargePct = Math.max(0.08, this.kickCharge);
+
+    // Se a bola estiver dentro do raio de alcance
+    if (dist <= kickRange && dist > 0) {
+      // Força calculada: vai de minPower (5.5) até maxPower (14.5 mantida exatamente como está agora!)
+      const minPower = this.kickPowerMin;
+      const maxPower = this.kickPowerMax;
+      const totalPower = minPower + chargePct * (maxPower - minPower);
+
+      // Direção do chute: do centro do jogador passando pelo centro da bola
+      let dirX = dx / dist;
+      let dirY = dy / dist;
+
+      // Leve influência da movimentação do jogador para curva
+      const pSpeed = Math.hypot(this.vx, this.vy);
+      if (pSpeed > 0.25) {
+        dirX = dirX * 0.72 + (this.vx / pSpeed) * 0.28;
+        dirY = dirY * 0.72 + (this.vy / pSpeed) * 0.28;
+        const dLen = Math.hypot(dirX, dirY);
+        dirX /= dLen;
+        dirY /= dLen;
+      }
+
+      // CRÍTICO ANTI-BUG: Descola imediatamente a bola da colisão do corpo do jogador
+      // Isso impede que a bola seja prensada ou amortecida pelo próprio jogador no mesmo frame!
+      ball.x = this.x + dirX * (this.radius + ball.radius + 6);
+      ball.y = this.y + dirY * (this.radius + ball.radius + 6);
+
+      ball.vx = dirX * totalPower + this.vx * 0.25;
+      ball.vy = dirY * totalPower + this.vy * 0.25;
+      ball.isSuperShot = (chargePct > 0.65);
+      ball.lastTouchPlayer = this;
+
+      // kickAnimTimer protege a bola da colisão do próprio chutador por 16 frames
+      this.kickAnimTimer = 16;
+      // Cooldown curto de apenas 8 frames (~0.13s) permite espamar chutes rápidos e fluidos sem travar a bola!
+      this.kickCooldown = 8;
+
+      audio.playKick(chargePct);
+      if (game) game.triggerShake(chargePct > 0.65 ? 6 : 3);
+      particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, Math.floor(6 + chargePct * 10));
+    } else {
+      // Chute no vácuo: ZERO cooldown para nunca travar o jogador ao alcançar a bola!
+      this.kickAnimTimer = 6;
+      this.kickCooldown = 0;
+      audio.playKick(0.2);
     }
   }
 
-  executeKick(ball, particles) {
+  // Chute executado pela IA (Caveira)
+  executeInstantKick(ball, particles, powerPct = 0.85) {
     if (this.kickCooldown > 0) return;
-    const dist = Math.hypot(ball.x - this.x, ball.y - this.y);
+
+    const dx = ball.x - this.x;
+    const dy = ball.y - this.y;
+    const dist = Math.hypot(dx, dy);
     const kickRange = this.radius + ball.radius + 20;
 
-    // Se estiver no alcance da bola
-    if (dist <= kickRange) {
-      const powerPct = Math.max(0.2, this.kickCharge);
-      const minPower = 3.6;
-      const maxPower = 9.8; // Bola mais rápida e potente
+    if (dist <= kickRange && dist > 0) {
+      const minPower = this.kickPowerMin;
+      const maxPower = this.kickPowerMax;
       const totalPower = minPower + powerPct * (maxPower - minPower);
 
-      // Direção do chute: para onde o jogador está virado ou pro gol
-      let angle = this.facingAngle;
-      const targetGoalX = this.team === 'beico' ? WORLD.courtRight : WORLD.courtLeft;
-      const targetGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2;
+      let dirX = dx / dist;
+      let dirY = dy / dist;
 
-      // Leve auxílio de mira arcade em direção ao gol adversário
-      const angleToGoal = Math.atan2(targetGoalY - this.y, targetGoalX - this.x);
-      // Pondera a direção do jogador e do gol
-      angle = angle * 0.45 + angleToGoal * 0.55;
+      // Descola imediatamente a bola do corpo da IA
+      ball.x = this.x + dirX * (this.radius + ball.radius + 6);
+      ball.y = this.y + dirY * (this.radius + ball.radius + 6);
 
-      ball.vx = Math.cos(angle) * totalPower;
-      ball.vy = Math.sin(angle) * totalPower;
+      ball.vx = dirX * totalPower + this.vx * 0.20;
+      ball.vy = dirY * totalPower + this.vy * 0.20;
       ball.isSuperShot = (powerPct > 0.75);
       ball.lastTouchPlayer = this;
 
-      this.kickAnimTimer = 14;
-      this.kickCooldown = 60; // 1 segundo (60 frames) de intervalo para poder chutar de novo
-
-      // Sons e Efeitos
+      this.kickAnimTimer = 16;
+      this.kickCooldown = 25; // Cooldown equilibrado na IA
       audio.playKick(powerPct);
-      if (ball.isSuperShot) {
-        game.triggerShake(7);
-        particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 14);
-      } else {
-        particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 4);
-      }
+      if (game) game.triggerShake(powerPct > 0.75 ? 6 : 3);
+      particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 10);
     }
   }
 
-  executeInstantKick(ball, particles, power = 0.55) {
-    if (this.kickCooldown > 0) return;
-    const dist = Math.hypot(ball.x - this.x, ball.y - this.y);
-    const kickRange = this.radius + ball.radius + 18;
-
-    if (dist <= kickRange) {
-      const targetGoalX = this.team === 'beico' ? WORLD.courtRight : WORLD.courtLeft;
-      const targetGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2 + (Math.random() * 60 - 30);
-      const angle = Math.atan2(targetGoalY - this.y, targetGoalX - this.x);
-
-      const minPower = 3.4;
-      const maxPower = 7.8;
-      const totalPower = minPower + power * (maxPower - minPower);
-
-      ball.vx = Math.cos(angle) * totalPower;
-      ball.vy = Math.sin(angle) * totalPower;
-      ball.isSuperShot = (power > 0.85);
-      ball.lastTouchPlayer = this;
-
-      this.kickAnimTimer = 12;
-      this.kickCooldown = 60; // 1 segundo de intervalo para poder chutar de novo
-      audio.playKick(power);
-      if (ball.isSuperShot) {
-        game.triggerShake(5);
-        particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 8);
-      }
-    }
-  }
-
-  // Passe direcionado inteligente do bot para o companheiro
-  passTo(targetPlayer, ball, particles) {
-    if (this.kickCooldown > 0) return;
-    const dist = Math.hypot(ball.x - this.x, ball.y - this.y);
-    const kickRange = this.radius + ball.radius + 24;
-
-    if (dist <= kickRange) {
-      // Calcular antecipação na direção de movimento do companheiro
-      const leadX = targetPlayer.x + targetPlayer.vx * 7;
-      const leadY = targetPlayer.y + targetPlayer.vy * 7;
-      const angle = Math.atan2(leadY - this.y, leadX - this.x);
-      const distToPartner = Math.hypot(leadX - this.x, leadY - this.y);
-
-      // Força de passe calculada para chegar rápida e precisa nos pés
-      const passPower = Math.min(6.8, Math.max(3.4, distToPartner * 0.012 + 2.8));
-
-      ball.vx = Math.cos(angle) * passPower;
-      ball.vy = Math.sin(angle) * passPower;
-      ball.isSuperShot = false;
-      ball.lastTouchPlayer = this;
-
-      this.facingAngle = angle;
-      this.kickAnimTimer = 12;
-      this.kickCooldown = 60; // 1 segundo de intervalo
-
-      audio.playKick(0.35);
-      particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 4);
-    }
-  }
-
-  // Condução da bola suave nos pés (drible arcade de rua controlado e dinâmico)
+  // Interação física da bola com o corpo (quique elástico e condução)
   handleBallContact(ball, particles) {
-    // Se acabou de chutar a bola, não captura de volta imediatamente
+    // Se o jogador acabou de chutar a bola, não interceptar a saída dela!
     if (this.kickAnimTimer > 0) return;
 
     const dx = ball.x - this.x;
     const dy = ball.y - this.y;
     const dist = Math.hypot(dx, dy);
-    const controlDist = this.radius + ball.radius + 14;
+    const minDist = this.radius + ball.radius;
 
-    if (dist < controlDist) {
+    if (dist < minDist && dist > 0) {
       ball.lastTouchPlayer = this;
+      const nx = dx / dist;
+      const ny = dy / dist;
 
+      // 1. Separação de corpos (evita sobreposição)
+      ball.x = this.x + nx * minDist;
+      ball.y = this.y + ny * minDist;
+
+      // 2. Colisão elástica no corpo
+      const rvx = ball.vx - this.vx;
+      const rvy = ball.vy - this.vy;
+      const velAlongNormal = rvx * nx + rvy * ny;
+
+      if (velAlongNormal < 0) {
+        const restitution = 0.55; // Quique elástico vivo
+        const impulse = -(1 + restitution) * velAlongNormal;
+        ball.vx += nx * impulse;
+        ball.vy += ny * impulse;
+      }
+
+      // 3. Condução ao avançar sobre a bola
       const playerSpeed = Math.hypot(this.vx, this.vy);
+      const pushDot = this.vx * nx + this.vy * ny;
+      if (pushDot > 0) {
+        ball.vx += this.vx * 0.42;
+        ball.vy += this.vy * 0.42;
+      }
 
-      if (playerSpeed > 0.15) {
-        // Condução limpa: a bola fica logo à frente do jogador na direção do movimento
-        const leadDist = this.radius + ball.radius + 4;
-        const targetX = this.x + Math.cos(this.facingAngle) * leadDist;
-        const targetY = this.y + Math.sin(this.facingAngle) * leadDist;
-
-        // Atração magnética suave para a frente dos pés, permitindo condução em velocidade
-        const pullFactor = 0.26;
-        ball.vx = ball.vx * 0.32 + (targetX - ball.x) * pullFactor + this.vx * 0.72;
-        ball.vy = ball.vy * 0.32 + (targetY - ball.y) * pullFactor + this.vy * 0.72;
-
-        // Drible de rua / caneta se estiver em velocidade com cooldown
-        if (playerSpeed > 1.2 && this.dribbleCooldown <= 0) {
-          this.dribbleCooldown = 120;
-          audio.playDribble();
-        }
-      } else {
-        // Jogador parado ou quase parado: amortece a bola suavemente
-        ball.vx *= 0.55;
-        ball.vy *= 0.55;
-        const minDist = this.radius + ball.radius;
-        if (dist < minDist) {
-          const nx = Math.cos(this.facingAngle);
-          const ny = Math.sin(this.facingAngle);
-          ball.x = this.x + nx * minDist;
-          ball.y = this.y + ny * minDist;
-        }
+      if (playerSpeed > 0.4 && this.dribbleCooldown <= 0) {
+        this.dribbleCooldown = 16;
+        audio.playDribble();
+        particles.addDust(ball.x, ball.y, 'rgba(255, 255, 255, 0.4)', 2);
       }
     }
   }
 
-  // Comportamento Inteligente da IA: CONDUZ A BOLA, DRIBLA E CHUTA NO MOMENTO CERTO
+  // Inteligência Artificial pura para 1v1 estilo Beatball
   computeAI(ball, players) {
-    const input = { x: 0, y: 0, wantKick: false, wantPass: false, passTarget: null, kickPower: 0.65 };
+    const input = { x: 0, y: 0, wantKick: false, kickPower: 0.85 };
 
-    const targetGoalX = this.team === 'beico' ? WORLD.courtRight : WORLD.courtLeft;
-    const ownGoalX = this.team === 'beico' ? WORLD.courtLeft : WORLD.courtRight;
+    const ownGoalX = WORLD.courtRight; // 1180
+    const targetGoalX = WORLD.courtLeft; // 120
     const midGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2;
 
-    const distToBall = Math.hypot(ball.x - this.x, ball.y - this.y);
-    const distToTargetGoal = Math.hypot(targetGoalX - this.x, midGoalY - this.y);
-    const hasBall = (distToBall < this.radius + ball.radius + 16);
+    const dxToBall = ball.x - this.x;
+    const dyToBall = ball.y - this.y;
+    const distToBall = Math.hypot(dxToBall, dyToBall);
 
-    // Companheiro de time
-    const teammate = players && players.find(p => p.team === this.team && p !== this);
-    const humanTeammate = teammate && teammate.isControlled ? teammate : null;
+    // Antecipação da trajetória da bola calibrada pelos atributos de inteligência da fase
+    const lead = this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8;
+    const futureBallX = ball.x + ball.vx * lead;
+    const futureBallY = ball.y + ball.vy * lead;
 
-    // Encontrar adversário mais próximo para simular finta / drible
-    let nearestOpponent = null;
-    let minOppDist = 9999;
-    if (players) {
-      for (const p of players) {
-        if (p.team !== this.team) {
-          const d = Math.hypot(p.x - this.x, p.y - this.y);
-          if (d < minOppDist) {
-            minOppDist = d;
-            nearestOpponent = p;
-          }
-        }
+    // Checa se o adversário acabou de chutar a bola para não anular o chute no mesmo frame
+    const opponentJustKicked = ball.lastTouchPlayer && ball.lastTouchPlayer !== this && ball.lastTouchPlayer.kickAnimTimer > 8;
+
+    // Situação 1: A bola está atrás do bot (perigo iminente de gol contra)
+    if (ball.x > this.x - 20) {
+      const evadeY = (ball.y < midGoalY) ? ball.y + 60 : ball.y - 60;
+      const retreatX = Math.min(ownGoalX - 50, ball.x + 80);
+      const toRetreatX = retreatX - this.x;
+      const toRetreatY = evadeY - this.y;
+      const len = Math.hypot(toRetreatX, toRetreatY);
+      if (len > 5) {
+        input.x = toRetreatX / len;
+        input.y = toRetreatY / len;
       }
+      return input;
     }
 
-    if (hasBall) {
-      this.conductionTimer = (this.conductionTimer || 0) + 1;
-    } else {
-      this.conductionTimer = 0;
-    }
+    // Situação 2: Defesa e Ataque 1v1
+    const ballInOurHalf = ball.x > (WORLD.courtLeft + WORLD.courtRight) / 2;
+    const ballDangerous = ball.vx > 1.2 && ball.x > 800;
 
-    // =================================================================
-    // 1. QUANDO O BOT ESTÁ COM A BOLA: CONDUZ, FAZ FINTAS E NÃO SÓ CHUTA
-    // =================================================================
-    if (hasBall) {
-      // Variação orgânica para drible de rua (fintas suaves e ondulação na condução)
-      const weave = Math.sin(this.conductionTimer * 0.08) * 55;
-      const targetY = Math.max(WORLD.courtTop + 70, Math.min(WORLD.courtBottom - 70, midGoalY + weave));
+    const guardX = Math.min(ownGoalX - 80, Math.max(ownGoalX - 260, ball.x + 160));
+    const guardY = Math.max(WORLD.goalYTop - 15, Math.min(WORLD.goalYBottom + 15, (futureBallY + midGoalY) / 2));
 
-      // Vetor de corrida avançando com a bola em direção ao gol rival
-      let moveDirX = targetGoalX - this.x;
-      let moveDirY = targetY - this.y;
+    const attackDist = this.aiAttackDist !== undefined ? this.aiAttackDist : 260;
+    const shouldAttackBall = (distToBall < attackDist) || ballDangerous || (!ballInOurHalf && distToBall < (attackDist + 160));
 
-      // Finta de corpo / desvio lateral se o adversário estiver vindo de frente
-      if (nearestOpponent && minOppDist < 85) {
-        const oppDx = nearestOpponent.x - this.x;
-        const isOppInFront = (this.team === 'beico' && oppDx > 0) || (this.team === 'rivais' && oppDx < 0);
-        if (isOppInFront) {
-          const dodgeSign = (this.y < nearestOpponent.y) ? -1 : 1;
-          moveDirY += dodgeSign * 100;
-        }
+    if (shouldAttackBall) {
+      // Posiciona-se logo atrás da bola em direção ao gol alvo
+      const attackTargetX = ball.x + 22;
+      const attackTargetY = ball.y + (ball.y - midGoalY) * 0.12;
+
+      const toTargetX = attackTargetX - this.x;
+      const toTargetY = attackTargetY - this.y;
+      const len = Math.hypot(toTargetX, toTargetY);
+      if (len > 4) {
+        input.x = toTargetX / len;
+        input.y = toTargetY / len;
       }
 
-      const moveLen = Math.hypot(moveDirX, moveDirY);
-      if (moveLen > 5) {
-        input.x = moveDirX / moveLen;
-        input.y = moveDirY / moveLen;
-      }
-
-      // DECISÃO DO BOT COMPANHEIRO DO JOGADOR HUMANO (ex: Biel):
-      if (humanTeammate) {
-        // Biel conduz a bola avançando pelo campo (não toca instantaneamente)
-        if (this.conductionTimer > 45 && this.kickCooldown <= 0) {
-          // Se Biel estiver perto da área do gol, ele bate firme pro gol!
-          if (distToTargetGoal < 260) {
-            input.wantKick = true;
-            input.kickPower = 0.85;
-            this.conductionTimer = 0;
-            return input;
-          }
-          // Caso contrário, faz o passe açucarado para o jogador humano
-          input.wantPass = true;
-          input.passTarget = humanTeammate;
-          this.conductionTimer = 0;
-          return input;
-        }
-        return input;
-      }
-
-      // DECISÃO DOS BOTS ADVERSÁRIOS / ATACANTE:
-      if (this.role === 'striker') {
-        // Conduz a bola para o ataque; só finaliza após conduzir (pelo menos 35 frames ~ 0.6s)
-        const canShoot = (this.conductionTimer >= 35 && this.kickCooldown <= 0);
-
-        if (canShoot) {
-          // Finaliza se estiver no terço final (< 300px do gol) ou conduziu bastante tempo
-          if (distToTargetGoal < 300 || this.conductionTimer > 80 || (minOppDist < 45 && distToTargetGoal < 450)) {
-            input.wantKick = true;
-            input.kickPower = distToTargetGoal < 260 ? 0.9 : 0.75;
-            this.conductionTimer = 0;
-            return input;
-          }
-        }
-        return input;
-      } else {
-        // Defensor (Zika): quando desarma, conduz tirando da área antes de passar ou chutar
-        if (this.conductionTimer > 35 && this.kickCooldown <= 0) {
-          if (teammate) {
-            input.wantPass = true;
-            input.passTarget = teammate;
-            this.conductionTimer = 0;
-            return input;
-          } else {
-            input.wantKick = true;
-            input.kickPower = 0.8;
-            this.conductionTimer = 0;
-            return input;
-          }
-        }
-        return input;
-      }
-    }
-
-    // =================================================================
-    // 2. QUANDO O BOT NÃO ESTÁ COM A BOLA: BUSCA E POSICIONAMENTO
-    // =================================================================
-    if (this.role === 'striker') {
-      // Atacante corre em direção à bola para dominar e conduzir
-      const dx = ball.x - this.x;
-      const dy = ball.y - this.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist > 5) {
-        input.x = dx / dist;
-        input.y = dy / dist;
-      }
-
-      // Rebote imediato apenas se a bola estiver solta na pequena área (< 140px)
-      if (distToBall < this.radius + ball.radius + 12 && distToTargetGoal < 140 && this.kickCooldown <= 0) {
+      // Chute calibrado estilo Beatball com checagem de cooldown e força personalizada da fase
+      const inKickRange = distToBall <= (this.radius + ball.radius + 18);
+      if (inKickRange && this.x > ball.x - 4 && this.kickCooldown <= 0 && !opponentJustKicked) {
         input.wantKick = true;
-        input.kickPower = 0.95;
+        const pwr = this.kickPowerDefault !== undefined ? this.kickPowerDefault : (distToBall < 200 ? 0.95 : 0.75);
+        input.kickPower = pwr;
       }
     } else {
-      // Defensor / Goleiro da linha
-      const guardX = ownGoalX + (this.team === 'beico' ? 140 : -140);
-      const guardY = Math.max(WORLD.goalYTop - 20, Math.min(WORLD.goalYBottom + 20, ball.y));
+      // Guarda defensiva
+      const toGuardX = guardX - this.x;
+      const toGuardY = guardY - this.y;
+      const len = Math.hypot(toGuardX, toGuardY);
+      if (len > 6) {
+        input.x = toGuardX / len;
+        input.y = toGuardY / len;
+      }
 
-      const ballInDefense = (this.team === 'beico' && ball.x < WORLD.courtLeft + 380) ||
-                            (this.team === 'rivais' && ball.x > WORLD.courtRight - 380);
-
-      if (ballInDefense || distToBall < 190) {
-        const dx = ball.x - this.x;
-        const dy = ball.y - this.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 5) {
-          input.x = dx / dist;
-          input.y = dy / dist;
-        }
-      } else {
-        // Posicionamento defensivo protegendo o gol
-        const dx = guardX - this.x;
-        const dy = guardY - this.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 10) {
-          input.x = dx / dist;
-          input.y = dy / dist;
-        }
+      if (distToBall <= (this.radius + ball.radius + 18) && this.x > ball.x - 4 && this.kickCooldown <= 0 && !opponentJustKicked) {
+        input.wantKick = true;
+        input.kickPower = this.kickPowerDefault !== undefined ? this.kickPowerDefault : 0.85;
       }
     }
 
@@ -1205,15 +1233,55 @@ class Player {
     ctx.fill();
     ctx.restore();
 
-    // 2. Anel de Destaque para Jogador Controlado
+    // 2. Anel de Destaque para Jogador Controlado com Indicador de Força e Recarga
     if (this.isControlled) {
       ctx.save();
       const ringColor = this.controlId === 1 ? '#facc15' : '#ef4444';
-      ctx.strokeStyle = ringColor;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y + 6, this.radius + 8, 0, Math.PI * 2);
-      ctx.stroke();
+
+      if (this.isChargingKick && this.kickCharge > 0) {
+        // Carregando força: Anel no chão pulsa e brilha com a carga acumulada
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 6, this.radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth = 4.2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 6, this.radius + 8, -Math.PI / 2, -Math.PI / 2 + this.kickCharge * Math.PI * 2);
+        ctx.stroke();
+
+        // Barra de força arcade flutuante sobre a cabeça
+        const barW = 38;
+        const barH = 6;
+        const barX = this.x - barW / 2;
+        const barY = this.y - 48;
+
+        // Fundo escuro da barra
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+
+        // Cor dinâmica da carga (Verde -> Amarelo -> Vermelho Máximo)
+        let fillGrad = '#22c55e';
+        if (this.kickCharge > 0.75) fillGrad = '#ef4444';
+        else if (this.kickCharge > 0.40) fillGrad = '#facc15';
+
+        ctx.fillStyle = fillGrad;
+        ctx.fillRect(barX, barY, barW * this.kickCharge, barH);
+
+        // Borda arcade
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
+      } else {
+        // Pronto para chutar: Anel completo e brilhante
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 6, this.radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       // Indicador de seta acima do jogador
       ctx.fillStyle = ringColor;
@@ -2389,17 +2457,20 @@ class FavelaScenery {
     ctx.arc(midX, midY, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pequenas Áreas / Linhas de Pênalti (Proporcionais ao novo gol ampliado)
+    // Pequenas Áreas / Linhas de Pênalti (Proporcionais ao gol 1v1 diminuído)
+    const goalH = WORLD.goalYBottom - WORLD.goalYTop;
+    const areaH = goalH + 60;
+    const areaW = 90;
     // Lado Esquerdo
-    ctx.strokeRect(cl, midY - 145, 125, 290);
+    ctx.strokeRect(cl, midY - areaH / 2, areaW, areaH);
     ctx.beginPath();
-    ctx.arc(cl + 90, midY, 4, 0, Math.PI * 2);
+    ctx.arc(cl + areaW - 25, midY, 4, 0, Math.PI * 2);
     ctx.fill();
 
     // Lado Direito
-    ctx.strokeRect(cr - 125, midY - 145, 125, 290);
+    ctx.strokeRect(cr - areaW, midY - areaH / 2, areaW, areaH);
     ctx.beginPath();
-    ctx.arc(cr - 90, midY, 4, 0, Math.PI * 2);
+    ctx.arc(cr - areaW + 25, midY, 4, 0, Math.PI * 2);
     ctx.fill();
 
     // Marcações de spray no chão: "BEIÇO STREET"
@@ -2565,7 +2636,12 @@ class GameEngine {
     this.ctx = this.canvas.getContext('2d');
 
     this.state = 'MENU'; // 'MENU', 'COUNTDOWN', 'PLAYING', 'GOAL', 'GAMEOVER'
-    this.gameMode = '1P'; // '1P' ou '2P'
+    this.gameMode = '1P'; // '1P', '2P' ou 'TOURNAMENT'
+
+    // Modo Torneio (Copa da Quebrada - 4 Fases Progressivas)
+    this.isTournament = false;
+    this.tournamentRound = 0; // 0 = Oitavas, 1 = Quartas, 2 = Semis, 3 = Final
+    this.isGoldenGoal = false;
 
     // Tempo de Partida (2 minutos = 120 segundos)
     this.matchDuration = 120;
@@ -2582,7 +2658,7 @@ class GameEngine {
     this.particles = new ParticleSystem();
     this.ball = new Ball(WORLD.width / 2, (WORLD.courtTop + WORLD.courtBottom) / 2);
 
-    // Configuração dos 2 Times (2v2 Street Soccer)
+    // Configuração dos 2 Times (1v1 Street Soccer)
     this.players = [];
     this.initPlayers();
 
@@ -2597,6 +2673,7 @@ class GameEngine {
     this.timerEl = document.getElementById('match-timer');
     this.goalBanner = document.getElementById('goal-banner');
     this.goalScorerEl = document.getElementById('goal-scorer');
+    this.goldenGoalBanner = document.getElementById('golden-goal-banner');
     this.countdownBanner = document.getElementById('countdown-banner');
     this.countdownTextEl = document.getElementById('countdown-text');
     this.popupsContainer = document.getElementById('arcade-popups-container');
@@ -2609,6 +2686,16 @@ class GameEngine {
     this.mainMenu = document.getElementById('main-menu');
     this.howToPlayModal = document.getElementById('how-to-play-modal');
     this.gameOverScreen = document.getElementById('game-over-screen');
+
+    // Elementos Específicos do Modo Torneio
+    this.tournamentModal = document.getElementById('tournament-modal');
+    this.tournamentResultModal = document.getElementById('tournament-result-modal');
+    this.tournamentStageBadge = document.getElementById('tournament-stage-badge');
+    this.tournamentStageText = document.getElementById('tournament-stage-text');
+
+    this.rivalScoreName = document.getElementById('name-rivais');
+    this.rivalScoreSub = document.getElementById('sub-rivais');
+    this.rivalScoreLogo = document.getElementById('logo-rivais');
 
     // Ajuste de Resolução
     this.resizeCanvas();
@@ -2624,14 +2711,14 @@ class GameEngine {
 
   initPlayers() {
     this.players = [
-      // TIME BEIÇO
+      // TIME BEIÇO (P1)
       new Player({
         name: 'Beiço #10',
         team: 'beico',
         isControlled: true,
         controlId: 1,
         role: 'striker',
-        homeX: 520,
+        homeX: 430,
         homeY: 430,
         skinTone: '#8d5524',
         shirtColor: '#facc15',
@@ -2639,49 +2726,21 @@ class GameEngine {
         hairStyle: 'blonde', // Nevou
         number: '10'
       }),
-      new Player({
-        name: 'Biel #4',
-        team: 'beico',
-        isControlled: false,
-        controlId: null,
-        role: 'defender',
-        homeX: 320,
-        homeY: 430,
-        skinTone: '#5c3826',
-        shirtColor: '#facc15',
-        shortsColor: '#047857',
-        hairStyle: 'dreads',
-        number: '4'
-      }),
 
-      // TIME RIVAIS
+      // TIME RIVAIS (P2 / IA)
       new Player({
         name: 'Caveira #9',
         team: 'rivais',
-        isControlled: false, // Pode virar P2 no modo 2 Jogadores
+        isControlled: false, // Pode virar P2 no modo 2 Jogadores, ou IA no modo 1P
         controlId: 2,
         role: 'striker',
-        homeX: 780,
+        homeX: 870,
         homeY: 430,
         skinTone: '#a16207',
         shirtColor: '#ef4444',
         shortsColor: '#4338ca',
         hairStyle: 'buzz',
         number: '9'
-      }),
-      new Player({
-        name: 'Zika #5',
-        team: 'rivais',
-        isControlled: false,
-        controlId: null,
-        role: 'defender',
-        homeX: 980,
-        homeY: 430,
-        skinTone: '#3f2512',
-        shirtColor: '#ef4444',
-        shortsColor: '#4338ca',
-        hairStyle: 'cap',
-        number: '5'
       })
     ];
   }
@@ -2716,25 +2775,122 @@ class GameEngine {
       }
     });
 
+    // Suporte a carregar e soltar força com o botão esquerdo do mouse
+    this.mouseKick = false;
+    window.addEventListener('mousedown', (e) => {
+      audio.init();
+      if (e.button === 0 && this.state === 'PLAYING') {
+        const target = e.target;
+        if (!target.closest('button')) {
+          this.mouseKick = true;
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) {
+        this.mouseKick = false;
+      }
+    });
+
     window.addEventListener('blur', () => {
       this.keys = {};
+      this.mouseKick = false;
     });
   }
 
   bindUIButtons() {
-    // 1 Jogador
+    // 1 Jogador (Amistoso 1v1)
     document.getElementById('btn-1player').addEventListener('click', () => {
       audio.init();
       audio.playClick();
       this.startMatch('1P');
     });
 
-    // 2 Jogadores
+    // 2 Jogadores (1v1 no mesmo teclado)
     document.getElementById('btn-2players').addEventListener('click', () => {
       audio.init();
       audio.playClick();
       this.startMatch('2P');
     });
+
+    // Modo Torneio (Copa da Quebrada - 4 Fases Progressivas)
+    const btnTournament = document.getElementById('btn-tournament');
+    if (btnTournament) {
+      btnTournament.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        this.openTournamentModal();
+      });
+    }
+
+    // Fechar Modal do Torneio
+    const btnCloseTourney = document.getElementById('btn-close-tournament');
+    if (btnCloseTourney) {
+      btnCloseTourney.addEventListener('click', () => {
+        audio.playClick();
+        this.closeTournamentModal();
+      });
+    }
+
+    const btnExitTourney = document.getElementById('btn-exit-tournament');
+    if (btnExitTourney) {
+      btnExitTourney.addEventListener('click', () => {
+        audio.playClick();
+        this.closeTournamentModal();
+      });
+    }
+
+    // Botão de Iniciar Partida da Fase Atual do Torneio
+    const btnStartTourneyMatch = document.getElementById('btn-start-tournament-match');
+    if (btnStartTourneyMatch) {
+      btnStartTourneyMatch.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        this.startTournamentMatch(this.tournamentRound);
+      });
+    }
+
+    // Ações do Modal de Resultado do Torneio
+    const btnTourneyNext = document.getElementById('btn-tourney-next');
+    if (btnTourneyNext) {
+      btnTourneyNext.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        if (this.tournamentRound >= 3) {
+          // Já ganhou a grande final! Reinicia o torneio para nova jornada
+          this.tournamentRound = 0;
+          this.tournamentResultModal.classList.add('hidden');
+          this.tournamentResultModal.classList.remove('active');
+          this.openTournamentModal();
+        } else {
+          // Avança para a próxima etapa (Quartas, Semis ou Final)
+          this.tournamentRound++;
+          this.tournamentResultModal.classList.add('hidden');
+          this.tournamentResultModal.classList.remove('active');
+          this.startTournamentMatch(this.tournamentRound);
+        }
+      });
+    }
+
+    const btnTourneyRetry = document.getElementById('btn-tourney-retry');
+    if (btnTourneyRetry) {
+      btnTourneyRetry.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        this.tournamentResultModal.classList.add('hidden');
+        this.tournamentResultModal.classList.remove('active');
+        this.startTournamentMatch(this.tournamentRound);
+      });
+    }
+
+    const btnTourneyMenu = document.getElementById('btn-tourney-menu');
+    if (btnTourneyMenu) {
+      btnTourneyMenu.addEventListener('click', () => {
+        audio.playClick();
+        this.returnToMenu();
+      });
+    }
 
     // Como Jogar
     document.getElementById('btn-how-to-play').addEventListener('click', () => {
@@ -2753,7 +2909,7 @@ class GameEngine {
     document.getElementById('btn-close-how').addEventListener('click', closeHow);
     document.getElementById('btn-back-menu').addEventListener('click', closeHow);
 
-    // Revanche / Jogar Novamente
+    // Revanche / Jogar Novamente (Amistoso)
     document.getElementById('btn-rematch').addEventListener('click', () => {
       audio.playClick();
       this.startMatch(this.gameMode);
@@ -2781,29 +2937,201 @@ class GameEngine {
     });
   }
 
+  // ====================================================================
+  // SISTEMA DO MODO TORNEIO (COPA DA QUEBRADA)
+  // ====================================================================
+  openTournamentModal() {
+    this.mainMenu.classList.remove('active');
+    this.mainMenu.classList.add('hidden');
+    this.tournamentModal.classList.remove('hidden');
+    this.tournamentModal.classList.add('active');
+    this.updateTournamentBracketUI();
+  }
+
+  closeTournamentModal() {
+    this.tournamentModal.classList.remove('active');
+    this.tournamentModal.classList.add('hidden');
+    this.mainMenu.classList.remove('hidden');
+    this.mainMenu.classList.add('active');
+  }
+
+  updateTournamentBracketUI() {
+    const curRound = Math.min(Math.max(0, this.tournamentRound), TOURNAMENT_ROUNDS.length - 1);
+    const roundData = TOURNAMENT_ROUNDS[curRound];
+
+    // Atualiza os 4 degraus do bracket visual (Oitavas, Quartas, Semis, Final)
+    for (let i = 0; i < TOURNAMENT_ROUNDS.length; i++) {
+      const stepEl = document.getElementById(`bracket-step-${i}`);
+      const statusEl = document.getElementById(`bracket-status-${i}`);
+      if (!stepEl || !statusEl) continue;
+
+      stepEl.classList.remove('step-completed', 'step-current', 'step-locked');
+      statusEl.classList.remove('status-completed', 'status-current', 'status-locked');
+
+      if (i < curRound) {
+        stepEl.classList.add('step-completed');
+        statusEl.classList.add('status-completed');
+        statusEl.textContent = 'VENCEU ✔️';
+      } else if (i === curRound) {
+        stepEl.classList.add('step-current');
+        statusEl.classList.add('status-current');
+        statusEl.textContent = 'ATUAL ⚔️';
+      } else {
+        stepEl.classList.add('step-locked');
+        statusEl.classList.add('status-locked');
+        statusEl.textContent = 'BLOQUEADO 🔒';
+      }
+    }
+
+    // Card de Destaque do Confronto
+    const avatarEl = document.getElementById('matchup-rival-avatar');
+    const nameEl = document.getElementById('matchup-rival-name');
+    const subEl = document.getElementById('matchup-rival-sub');
+    if (avatarEl) avatarEl.textContent = roundData.opponent.avatar;
+    if (nameEl) nameEl.textContent = roundData.opponent.name.toUpperCase();
+    if (subEl) subEl.textContent = (roundData.opponent.subName || 'RIVAIS').toUpperCase();
+
+    // Caixa de Inteligência da Fase
+    const intelTag = document.getElementById('intel-stage-tag');
+    const intelStars = document.getElementById('intel-stars');
+    const intelDesc = document.getElementById('intel-desc');
+    if (intelTag) intelTag.textContent = `${roundData.name.toUpperCase()} (${roundData.tag})`;
+    if (intelStars) intelStars.textContent = `${roundData.stars} Dificuldade ${roundData.difficultyLabel}`;
+    if (intelDesc) intelDesc.textContent = roundData.description;
+
+    // Botão de ação da fase
+    const btnPlayText = document.getElementById('btn-play-round-text');
+    if (btnPlayText) {
+      btnPlayText.textContent = `JOGAR ${roundData.name.toUpperCase()}`;
+    }
+  }
+
+  startTournamentMatch(roundIndex = 0) {
+    this.isTournament = true;
+    this.tournamentRound = Math.min(Math.max(0, roundIndex), TOURNAMENT_ROUNDS.length - 1);
+    this.isGoldenGoal = false;
+    this.gameMode = 'TOURNAMENT';
+
+    const roundData = TOURNAMENT_ROUNDS[this.tournamentRound];
+
+    // Configuração do Jogador 1 (Beiço)
+    const p1 = this.players[0];
+    p1.isControlled = true;
+    p1.controlId = 1;
+    p1.speed = 1.40;
+    p1.kickPowerMax = 14.5;
+    p1.kickPowerMin = 5.5;
+
+    // Configuração do Adversário conforme a Dificuldade e Identidade da Fase
+    const opp = roundData.opponent;
+    const p2 = this.players[1];
+    p2.isControlled = false;
+    p2.controlId = null;
+    p2.name = opp.name;
+    p2.shirtColor = opp.shirtColor;
+    p2.shortsColor = opp.shortsColor;
+    p2.skinTone = opp.skinTone;
+    p2.hairStyle = opp.hairStyle;
+    p2.hairColor = opp.hairColor;
+    p2.number = opp.number;
+    p2.speed = opp.speed;
+    p2.kickPowerMax = opp.kickPowerMax;
+    p2.aiLeadFrames = opp.aiLeadFrames;
+    p2.aiAttackDist = opp.aiAttackDist;
+    p2.kickPowerDefault = opp.kickPowerDefault;
+
+    // Atualização dos nomes e ícones no HUD do placar
+    if (this.rivalScoreName) this.rivalScoreName.textContent = opp.shortName || opp.name;
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = opp.subName || 'RIVAL';
+    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = opp.avatar || '⚡';
+
+    // Badge pulsante no topo da tela indicando a fase atual
+    if (this.tournamentStageBadge) {
+      this.tournamentStageBadge.classList.remove('hidden');
+    }
+    if (this.tournamentStageText) {
+      this.tournamentStageText.textContent = `${roundData.badge} (${this.tournamentRound + 1}/4)`;
+    }
+
+    this.p2PowerHud.classList.add('hidden');
+    document.getElementById('hud-match-hint').textContent = `TAÇA DAS FAVELA: [WASD ou SETAS + SEGURE ESPAÇO/CLIQUE P/ FORÇA] | VS ${opp.name.toUpperCase()}`;
+
+    // Placar zerado e duração equilibrada (90s)
+    this.scoreBeico = 0;
+    this.scoreRivais = 0;
+    this.matchDuration = 90;
+    this.timer = this.matchDuration;
+
+    // Transição de tela
+    this.tournamentModal.classList.remove('active');
+    this.tournamentModal.classList.add('hidden');
+    this.tournamentResultModal.classList.remove('active');
+    this.tournamentResultModal.classList.add('hidden');
+    this.mainMenu.classList.remove('active');
+    this.mainMenu.classList.add('hidden');
+    this.gameOverScreen.classList.remove('active');
+    this.gameOverScreen.classList.add('hidden');
+    if (this.goldenGoalBanner) this.goldenGoalBanner.classList.add('hidden');
+
+    this.hudElement.classList.remove('hidden');
+    this.updateScoreboard();
+    this.updateTimerDisplay();
+
+    this.startCountdown();
+  }
+
   startMatch(mode = '1P') {
+    this.isTournament = false;
+    this.isGoldenGoal = false;
     this.gameMode = mode;
     this.scoreBeico = 0;
     this.scoreRivais = 0;
+    this.matchDuration = 120;
     this.timer = this.matchDuration;
 
-    // Atualizar quem é controlado
+    // Esconder selo de torneio
+    if (this.tournamentStageBadge) {
+      this.tournamentStageBadge.classList.add('hidden');
+    }
+
+    // Resetar HUD do adversário para o padrão
+    if (this.rivalScoreName) this.rivalScoreName.textContent = 'RIVAIS';
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = 'DO OUTRO LADO';
+    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = '🔥';
+
+    // Atualizar jogadores
     const p1 = this.players[0]; // Beiço
-    const p2 = this.players[2]; // Caveira
+    const p2 = this.players[1]; // Rival
 
     p1.isControlled = true;
     p1.controlId = 1;
+    p1.speed = 1.40;
+    p1.kickPowerMax = 14.5;
+    p1.kickPowerMin = 5.5;
+
+    p2.name = 'Caveira #9';
+    p2.skinTone = '#a16207';
+    p2.shirtColor = '#ef4444';
+    p2.shortsColor = '#4338ca';
+    p2.hairStyle = 'buzz';
+    p2.hairColor = '#1c1917';
+    p2.number = '9';
+    p2.speed = 1.40;
+    p2.kickPowerMax = 14.5;
+    p2.aiLeadFrames = 8;
+    p2.aiAttackDist = 260;
+    p2.kickPowerDefault = 0.85;
 
     if (mode === '2P') {
       p2.isControlled = true;
       p2.controlId = 2;
       this.p2PowerHud.classList.remove('hidden');
-      document.getElementById('hud-match-hint').textContent = 'P1: [WASD + ESPAÇO] | P2: [SETAS + ENTER]';
+      document.getElementById('hud-match-hint').textContent = 'P1: [WASD + SEGURE ESPAÇO/CLIQUE] | P2: [SETAS + SEGURE ENTER]';
     } else {
       p2.isControlled = false;
       p2.controlId = null;
       this.p2PowerHud.classList.add('hidden');
-      document.getElementById('hud-match-hint').textContent = 'P1: [WASD ou SETAS + ESPAÇO]';
+      document.getElementById('hud-match-hint').textContent = 'P1: [WASD ou SETAS + SEGURE ESPAÇO/CLIQUE P/ FORÇA]';
     }
 
     // Esconder menus e mostrar HUD
@@ -2811,6 +3139,9 @@ class GameEngine {
     this.mainMenu.classList.add('hidden');
     this.gameOverScreen.classList.remove('active');
     this.gameOverScreen.classList.add('hidden');
+    if (this.tournamentModal) this.tournamentModal.classList.add('hidden');
+    if (this.tournamentResultModal) this.tournamentResultModal.classList.add('hidden');
+    if (this.goldenGoalBanner) this.goldenGoalBanner.classList.add('hidden');
     this.hudElement.classList.remove('hidden');
 
     this.updateScoreboard();
@@ -2856,14 +3187,37 @@ class GameEngine {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {
       if (this.state === 'PLAYING') {
-        this.timer--;
-        this.updateTimerDisplay();
+        // Se estiver no Gol de Ouro (morte súbita), o tempo é INFINITO e o cronômetro não decresce
+        if (!this.isGoldenGoal) {
+          this.timer--;
+          this.updateTimerDisplay();
 
-        if (this.timer <= 0) {
-          this.endMatch();
+          if (this.timer <= 0) {
+            // Se empatar quando o tempo regulamentar acabar, ENTRA NO GOL DE OURO COM TEMPO INFINITO!
+            if (this.scoreBeico === this.scoreRivais) {
+              this.triggerGoldenGoal();
+              return;
+            }
+            this.endMatch();
+          }
         }
       }
     }, 1000);
+  }
+
+  triggerGoldenGoal() {
+    this.isGoldenGoal = true;
+    this.updateTimerDisplay();
+    audio.playWhistle(true);
+    this.triggerShake(12);
+
+    // Exibir o banner de Gol de Ouro com tempo infinito
+    if (this.goldenGoalBanner) {
+      this.goldenGoalBanner.classList.remove('hidden');
+      setTimeout(() => {
+        this.goldenGoalBanner.classList.add('hidden');
+      }, 3200);
+    }
   }
 
   resetPositions() {
@@ -2874,6 +3228,13 @@ class GameEngine {
   }
 
   updateTimerDisplay() {
+    if (this.isGoldenGoal) {
+      this.timerEl.textContent = 'GOL DE OURO ∞';
+      this.timerEl.classList.add('hurry-up', 'golden-goal-timer');
+      return;
+    }
+
+    this.timerEl.classList.remove('golden-goal-timer');
     const mins = Math.floor(this.timer / 60);
     const secs = this.timer % 60;
     this.timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -2896,14 +3257,20 @@ class GameEngine {
     this.state = 'GOAL';
     if (this.timerInterval) clearInterval(this.timerInterval);
 
+    const wasGoldenGoal = this.isGoldenGoal;
+
     if (scoringTeam === 'beico') {
       this.scoreBeico++;
       this.scoreBeicoEl.classList.add('score-bump');
-      this.goalScorerEl.textContent = `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'TIME BEIÇO'} BROCOU NO ÂNGULO!`;
+      this.goalScorerEl.textContent = wasGoldenGoal
+        ? `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'TIME BEIÇO'} CRAVOU O GOL DE OURO HISTÓRICO!`
+        : `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'TIME BEIÇO'} BROCOU NO ÂNGULO!`;
     } else {
       this.scoreRivais++;
       this.scoreRivaisEl.classList.add('score-bump');
-      this.goalScorerEl.textContent = `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'RIVAIS'} MANDOU PRA REDE!`;
+      this.goalScorerEl.textContent = wasGoldenGoal
+        ? `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'RIVAIS'} MANDOU O GOL DE OURO DECISIVO!`
+        : `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'RIVAIS'} MANDOU PRA REDE!`;
     }
 
     setTimeout(() => {
@@ -2916,18 +3283,26 @@ class GameEngine {
     // Efeitos Sonoros e Visuais de Gol
     audio.playGoal();
     audio.playWhistle(true);
-    this.triggerShake(14);
+    this.triggerShake(wasGoldenGoal ? 18 : 14);
     this.particles.triggerGoalConfetti();
 
     this.goalBanner.classList.remove('hidden');
 
-    // Após 2.5s, reinicia a partida no centro
+    // Se foi Gol de Ouro (tempo infinito), a partida encerra imediatamente após o gol!
     setTimeout(() => {
       this.goalBanner.classList.add('hidden');
-      if (this.timer > 0) {
+      if (wasGoldenGoal) {
+        this.endMatch();
+      } else if (this.timer > 0) {
         this.startCountdown();
       } else {
-        this.endMatch();
+        // Se empatou no último segundo, aciona Gol de Ouro infinito para decidir!
+        if (this.scoreBeico === this.scoreRivais) {
+          this.triggerGoldenGoal();
+          this.startCountdown();
+        } else {
+          this.endMatch();
+        }
       }
     }, 2400);
   }
@@ -2938,6 +3313,13 @@ class GameEngine {
 
     audio.playWhistle(true);
 
+    // Se estiver no Modo Torneio, apresenta o resultado com chaveamento da Taça das Favela
+    if (this.isTournament) {
+      this.showTournamentResult();
+      return;
+    }
+
+    // Amistoso padrão
     const titleEl = document.getElementById('game-over-title');
     const subEl = document.getElementById('game-over-subtitle');
 
@@ -2947,26 +3329,125 @@ class GameEngine {
     if (this.scoreBeico > this.scoreRivais) {
       titleEl.textContent = 'É O BEIÇO!';
       titleEl.style.color = '#facc15';
-      subEl.textContent = 'A taça da favela fica em casa! Respeita os cria!';
+      subEl.textContent = this.isGoldenGoal 
+        ? 'Vitória heroica no Gol de Ouro com tempo infinito! Respeita!' 
+        : 'A Taça das Favela fica em casa! Respeita os cria!';
       this.particles.triggerGoalConfetti();
       audio.playCheer();
     } else if (this.scoreRivais > this.scoreBeico) {
       titleEl.textContent = 'HOJE NÃO DEU...';
       titleEl.style.color = '#ef4444';
-      subEl.textContent = 'Os rivais levaram essa. Mas amanhã tem revanche na quadra!';
+      subEl.textContent = this.isGoldenGoal 
+        ? 'Derrota dolorida na morte súbita do Gol de Ouro! Amanhã tem revanche!' 
+        : 'Os rivais levaram essa. Mas amanhã tem revanche na quadra!';
     } else {
-      titleEl.textContent = 'EMPATE HISTÓRICO!';
+      titleEl.textContent = 'GOL DE OURO!';
       titleEl.style.color = '#38bdf8';
-      subEl.textContent = 'Jogo pegado do início ao fim! Ninguém arrefeceu!';
+      subEl.textContent = 'Empatou! Quem fizer o gol leva tudo!';
     }
 
     this.gameOverScreen.classList.remove('hidden');
     this.gameOverScreen.classList.add('active');
   }
 
+  showTournamentResult() {
+    const curRound = this.tournamentRound;
+    const roundData = TOURNAMENT_ROUNDS[curRound];
+
+    const badgeEl = document.getElementById('tourney-result-badge');
+    const iconEl = document.getElementById('tourney-result-icon');
+    const titleEl = document.getElementById('tourney-result-title');
+    const descEl = document.getElementById('tourney-result-desc');
+
+    const scoreBeicoEl = document.getElementById('tourney-score-beico');
+    const scoreRivalEl = document.getElementById('tourney-score-rival');
+    const rivalNameEl = document.getElementById('tourney-score-rival-name');
+
+    const btnNext = document.getElementById('btn-tourney-next');
+    const btnNextText = document.getElementById('btn-tourney-next-text');
+    const btnRetry = document.getElementById('btn-tourney-retry');
+
+    if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreBeico;
+    if (scoreRivalEl) scoreRivalEl.textContent = this.scoreRivais;
+    if (rivalNameEl) rivalNameEl.textContent = roundData.opponent.shortName || roundData.opponent.name;
+
+    badgeEl.classList.remove('badge-eliminated', 'badge-champion');
+
+    const playerWon = this.scoreBeico > this.scoreRivais;
+
+    if (playerWon) {
+      this.particles.triggerGoalConfetti();
+      audio.playCheer();
+
+      if (curRound === 3) {
+        // CAMPEÃO DA GRANDE FINAL!
+        badgeEl.classList.add('badge-champion');
+        badgeEl.textContent = 'CAMPEÃO DA TAÇA DAS FAVELA! 👑';
+        iconEl.textContent = '🏆';
+        titleEl.textContent = 'É CAMPEÃO! A TAÇA DAS FAVELA É NOSSA!';
+        descEl.textContent = this.isGoldenGoal
+          ? 'GOL DE OURO NA GRANDE FINAL! Você derrubou Gildásio no tempo infinito e levantou a Taça das Favela! A favela tá em festa!'
+          : 'Você amassou Gildásio na Grande Final e conquistou a lendária Taça das Favela! Toda a comunidade tá soltando fogos!';
+
+        btnNext.classList.remove('hidden');
+        if (btnNextText) btnNextText.textContent = 'NOVO TORNEIO 🏆';
+        btnRetry.classList.add('hidden');
+      } else {
+        // AVANÇOU PARA A PRÓXIMA FASE!
+        const nextRound = TOURNAMENT_ROUNDS[curRound + 1];
+        badgeEl.textContent = 'CLASSIFICADO!';
+        iconEl.textContent = '⭐';
+        titleEl.textContent = `AVANÇOU PARA AS ${nextRound.name.toUpperCase()}!`;
+        descEl.textContent = this.isGoldenGoal
+          ? `GOL DE OURO SALVADOR! Você eliminou ${roundData.opponent.name} na morte súbita da Taça das Favela! Agora vem ${nextRound.opponent.name}!`
+          : `Vitória maiúscula! Você eliminou ${roundData.opponent.name} na Taça das Favela. Prepare o pé porque ${nextRound.opponent.name} te espera!`;
+
+        btnNext.classList.remove('hidden');
+        if (btnNextText) btnNextText.textContent = `PRÓXIMA FASE (${nextRound.name.toUpperCase()}) ➔`;
+        btnRetry.classList.add('hidden');
+      }
+    } else {
+      // ELIMINADO DO TORNEIO
+      badgeEl.classList.add('badge-eliminated');
+      badgeEl.textContent = 'ELIMINADO DA TAÇA DAS FAVELA';
+      iconEl.textContent = '💀';
+      titleEl.textContent = 'FIM DA LINHA NA TAÇA DAS FAVELA!';
+      descEl.textContent = this.isGoldenGoal
+        ? `${roundData.opponent.name} cravou o Gol de Ouro no tempo infinito. Na Taça das Favela só os fortes sobrevivem: treine e tente de novo!`
+        : `${roundData.opponent.name} levou a melhor nessa fase da Taça das Favela. Na favela não tem moleza: treine e tente de novo!`;
+
+      btnNext.classList.add('hidden');
+      btnRetry.classList.remove('hidden');
+    }
+
+    this.tournamentResultModal.classList.remove('hidden');
+    this.tournamentResultModal.classList.add('active');
+  }
+
   returnToMenu() {
     this.state = 'MENU';
     if (this.timerInterval) clearInterval(this.timerInterval);
+    this.isTournament = false;
+    this.isGoldenGoal = false;
+
+    if (this.tournamentStageBadge) {
+      this.tournamentStageBadge.classList.add('hidden');
+    }
+    if (this.goldenGoalBanner) {
+      this.goldenGoalBanner.classList.add('hidden');
+    }
+    if (this.tournamentModal) {
+      this.tournamentModal.classList.remove('active');
+      this.tournamentModal.classList.add('hidden');
+    }
+    if (this.tournamentResultModal) {
+      this.tournamentResultModal.classList.remove('active');
+      this.tournamentResultModal.classList.add('hidden');
+    }
+
+    if (this.rivalScoreName) this.rivalScoreName.textContent = 'RIVAIS';
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = 'DO OUTRO LADO';
+    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = '🔥';
 
     this.hudElement.classList.add('hidden');
     this.goalBanner.classList.add('hidden');
@@ -2979,7 +3460,7 @@ class GameEngine {
 
     // Deixar a IA jogando uma pelada no fundo do menu!
     this.players[0].isControlled = false;
-    this.players[2].isControlled = false;
+    this.players[1].isControlled = false;
     this.resetPositions();
   }
 
@@ -3013,7 +3494,7 @@ class GameEngine {
     this.scenery.update();
 
     const p1 = this.players[0];
-    const p2 = this.players[2];
+    const p2 = this.players[1];
 
     // No estado COUNTDOWN, todos devem permanecer 100% parados em seus lugares
     if (this.state === 'COUNTDOWN') {
@@ -3023,11 +3504,8 @@ class GameEngine {
         player.vx = 0;
         player.vy = 0;
         player.walkCycle = 0;
-        player.isChargingKick = false;
-        player.kickCharge = 0;
         player.kickAnimTimer = 0;
         player.kickCooldown = 0;
-        player.conductionTimer = 0;
         player.facingAngle = player.team === 'beico' ? 0 : Math.PI;
       }
       this.ball.x = WORLD.width / 2;
@@ -3043,7 +3521,7 @@ class GameEngine {
         player.update(this.keys, this.ball, this.players, this.particles);
       }
 
-      // Colisão entre jogadores (não atravessam um ao outro)
+      // Colisão entre jogadores (trombada física estilo Beatball)
       for (let i = 0; i < this.players.length; i++) {
         for (let j = i + 1; j < this.players.length; j++) {
           const pA = this.players[i];
@@ -3060,6 +3538,15 @@ class GameEngine {
             pA.y -= ny * overlap;
             pB.x += nx * overlap;
             pB.y += ny * overlap;
+
+            // Troca de momento físico em divididas
+            const dot = (pA.vx - pB.vx) * nx + (pA.vy - pB.vy) * ny;
+            if (dot > 0) {
+              pA.vx -= dot * nx * 0.35;
+              pA.vy -= dot * ny * 0.35;
+              pB.vx += dot * nx * 0.35;
+              pB.vy += dot * ny * 0.35;
+            }
           }
         }
       }
@@ -3127,5 +3614,5 @@ class GameEngine {
 
 // Inicializar quando o DOM estiver pronto
 window.addEventListener('DOMContentLoaded', () => {
-  window.game = new GameEngine();
+  window.game = game = new GameEngine();
 });
