@@ -2018,6 +2018,16 @@ html, body, #game-container { background-color: #000; }
 .menu-footer { text-shadow: 1px 1px 0 #000; }
 @media (max-height: 700px) { .menu-title .mt-1, .menu-title .mt-2 { font-size: clamp(2.4rem, 8vw, 4.4rem); } }
 
+.ts-difficulty { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.ts-difficulty.hidden { display: none; }
+.ts-diff-label { font-family: var(--font-arcade); font-size: 0.8rem; letter-spacing: 1px; color: var(--beico-yellow); }
+.ts-diff-btn {
+  font-family: var(--font-arcade); font-size: 0.78rem; letter-spacing: 0.5px; color: #fff;
+  background: #0e0e0e; border: 2px solid rgba(255,255,255,0.18); border-radius: 6px;
+  padding: 7px 12px; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ts-diff-btn:hover { transform: translateY(-2px); border-color: var(--beico-green); }
+.ts-diff-btn.active { border-color: var(--beico-yellow); background: #151300; color: var(--beico-yellow); box-shadow: 0 0 14px rgba(255, 212, 0, 0.55); }
 </style>
 </head>
 <body>
@@ -2242,6 +2252,13 @@ html, body, #game-container { background-color: #000; }
             <div class="ts-selected" id="ts-p2-selected"></div>
             <div class="ts-grid" id="ts-p2-grid"></div>
           </div>
+        </div>
+        <div class="ts-difficulty hidden" id="ts-difficulty">
+          <span class="ts-diff-label">DIFICULDADE DA CPU:</span>
+          <button type="button" class="ts-diff-btn" data-diff="easy">😎 FÁCIL</button>
+          <button type="button" class="ts-diff-btn" data-diff="medium">⚽ MÉDIO</button>
+          <button type="button" class="ts-diff-btn" data-diff="hard">🔥 DIFÍCIL</button>
+          <button type="button" class="ts-diff-btn" data-diff="legend">👑 LENDÁRIO</button>
         </div>
         <div class="ts-footer">
           <button id="btn-team-select-play" class="btn-street btn-primary"><span>⚽</span> <span>BORA JOGAR!</span></button>
@@ -2769,7 +2786,11 @@ const WORLD = {
   postRadius: 6,
   // Física da Bola (Mais rápida, com deslizamento fluido e quique elástico)
   ballRadius: 11,
-  friction: 0.966,
+  friction: 0.987, // quanto mais perto de 1, mais a bola desliza
+  ballSpeedScale: 0.90, // multiplicador de velocidade da bola
+  playerSpeedScale: 0.90, // velocidade dos bonecos (0.90 = 10% mais lento)
+  botKickPowerScale: 0.80, // forca dos chutes do bot (menor = chuta mais fraco)
+  kickDelayFrames: 60,  // espera entre um chute e outro (60 frames = ~1 segundo)
   wallRestitution: 0.80
 };
 
@@ -2987,6 +3008,14 @@ function generateCampinasTournamentRounds(userTeamId) {
 
 let TOURNAMENT_ROUNDS = generateCampinasTournamentRounds('padre-anchieta');
 
+// Dificuldades do 1 JOGADOR x CPU (o MÉDIO é o comportamento padrão anterior)
+const DIFFICULTIES = {
+  easy:   { label: 'FÁCIL',     speed: 1.35, kickPowerMax: 7.0,  aiLeadFrames: 2,  aiAttackDist: 170, kickPowerDefault: 0.55, aiReactionFrames: 26 },
+  medium: { label: 'MÉDIO',     speed: 1.90, kickPowerMax: 9.0,  aiLeadFrames: 8,  aiAttackDist: 260, kickPowerDefault: 0.85, aiReactionFrames: 15 },
+  hard:   { label: 'DIFÍCIL',   speed: 2.05, kickPowerMax: 9.4,  aiLeadFrames: 11, aiAttackDist: 380, kickPowerDefault: 0.95, aiReactionFrames: 9 },
+  legend: { label: 'LENDÁRIO',  speed: 2.20, kickPowerMax: 10.0, aiLeadFrames: 14, aiAttackDist: 480, kickPowerDefault: 1.0, aiReactionFrames: 5 }
+};
+
 // ====================================================================
 // 3. SISTEMA DE PARTÍCULAS E EFEITOS VISUAIS
 // ====================================================================
@@ -3150,8 +3179,8 @@ class Ball {
     }
 
     // Movimentação
-    this.x += this.vx;
-    this.y += this.vy;
+    this.x += this.vx * WORLD.ballSpeedScale;
+    this.y += this.vy * WORLD.ballSpeedScale;
 
     // Rotação visual
     this.rotation += speed * 0.1;
@@ -3364,6 +3393,8 @@ class Player {
     this.aiLeadFrames = config.aiLeadFrames !== undefined ? config.aiLeadFrames : 8;
     this.aiAttackDist = config.aiAttackDist !== undefined ? config.aiAttackDist : 260;
     this.kickPowerDefault = config.kickPowerDefault !== undefined ? config.kickPowerDefault : 0.85;
+    this.aiReactionFrames = config.aiReactionFrames !== undefined ? config.aiReactionFrames : 12; // frames 'armando' o chute antes de bater
+    this.aiWindup = 0;
 
     // Visual / Aparência (100% mantido)
     this.skinTone = config.skinTone || '#8d5524';
@@ -3415,6 +3446,7 @@ class Player {
     this.aiJitterX = 0;
     this.aiJitterY = 0;
     this.aiLastLen = 0;
+    this.aiWindup = 0;
   }
 
   update(inputKeys, ball, players, particles) {
@@ -3490,8 +3522,8 @@ class Player {
       moveX /= len;
       moveY /= len;
       this.facingAngle = Math.atan2(moveY, moveX);
-      const targetVx = moveX * this.speed;
-      const targetVy = moveY * this.speed;
+      const targetVx = moveX * this.speed * WORLD.playerSpeedScale;
+      const targetVy = moveY * this.speed * WORLD.playerSpeedScale;
       // Aceleração suave e cadência de passos sincronizada com velocidade lenta
       this.vx += (targetVx - this.vx) * 0.34;
       this.vy += (targetVy - this.vy) * 0.34;
@@ -3596,7 +3628,7 @@ class Player {
       // kickAnimTimer protege a bola da colisão do próprio chutador por 16 frames
       this.kickAnimTimer = 16;
       // Cooldown curto de apenas 8 frames (~0.13s) permite espamar chutes rápidos e fluidos sem travar a bola!
-      this.kickCooldown = 8;
+      this.kickCooldown = WORLD.kickDelayFrames; // 1 segundo ate poder chutar de novo
 
       audio.playKick(chargePct);
       if (game) game.triggerShake(chargePct > 0.65 ? 6 : 3);
@@ -3616,27 +3648,38 @@ class Player {
     const dx = ball.x - this.x;
     const dy = ball.y - this.y;
     const dist = Math.hypot(dx, dy);
-    const kickRange = this.radius + ball.radius + 20;
+    const kickRange = this.radius + ball.radius + 10;
 
     if (dist <= kickRange && dist > 0) {
       const minPower = this.kickPowerMin;
       const maxPower = this.kickPowerMax;
-      const totalPower = minPower + powerPct * (maxPower - minPower);
+      const totalPower = (minPower + powerPct * (maxPower - minPower)) * WORLD.botKickPowerScale;
 
-      let dirX;
-      let dirY;
+      // Normal corpo -> bola (usada para posicionar a bola SEM teleportar)
+      const nx = dx / dist;
+      const ny = dy / dist;
+      let dirX = nx;
+      let dirY = ny;
+
       if (aim) {
-        const aimLen = Math.hypot(aim.x - ball.x, aim.y - ball.y) || 1;
-        dirX = (aim.x - ball.x) / aimLen;
-        dirY = (aim.y - ball.y) / aimLen;
-      } else {
-        dirX = dx / dist;
-        dirY = dy / dist;
+        let ax = aim.x - ball.x;
+        let ay = aim.y - ball.y;
+        const al = Math.hypot(ax, ay) || 1;
+        ax /= al; ay /= al;
+        // Nunca chuta "para dentro" do proprio corpo: desvia para fora
+        if (ax * nx + ay * ny < 0.35) {
+          ax += nx * 0.9;
+          ay += ny * 0.9;
+          const l = Math.hypot(ax, ay) || 1;
+          ax /= l; ay /= l;
+        }
+        dirX = ax;
+        dirY = ay;
       }
 
-      // Descola imediatamente a bola do corpo da IA
-      ball.x = this.x + dirX * (this.radius + ball.radius + 6);
-      ball.y = this.y + dirY * (this.radius + ball.radius + 6);
+      // Descola a bola do corpo ao longo da normal (sem pular para tras do bot)
+      ball.x = this.x + nx * (this.radius + ball.radius + 6);
+      ball.y = this.y + ny * (this.radius + ball.radius + 6);
 
       ball.vx = dirX * totalPower + this.vx * 0.20;
       ball.vy = dirY * totalPower + this.vy * 0.20;
@@ -3644,12 +3687,11 @@ class Player {
       ball.lastTouchPlayer = this;
 
       this.kickAnimTimer = 16;
-      this.kickCooldown = 16; // Cooldown menor: a IA joga mais solta e não trava
+      this.kickCooldown = WORLD.kickDelayFrames; // 1 segundo ate poder chutar de novo
       audio.playKick(powerPct);
       if (game) game.triggerShake(powerPct > 0.75 ? 6 : 3);
       particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 10);
     } else {
-      // Chute no vácuo: nunca deixa a IA travada esperando alcance
       this.kickAnimTimer = 6;
       this.kickCooldown = 0;
     }
@@ -3659,6 +3701,8 @@ class Player {
   handleBallContact(ball, particles) {
     // Se o jogador acabou de chutar a bola, não interceptar a saída dela!
     if (this.kickAnimTimer > 0) return;
+    // Bot (CPU) NAO tem contato de corpo com a bola: so mexe nela chutando
+    if (!this.isControlled) return;
 
     const dx = ball.x - this.x;
     const dy = ball.y - this.y;
@@ -3689,7 +3733,7 @@ class Player {
       // 3. Condução ao avançar sobre a bola
       const playerSpeed = Math.hypot(this.vx, this.vy);
       const pushDot = this.vx * nx + this.vy * ny;
-      if (pushDot > 0) {
+      if (pushDot > 0 && this.isControlled) {
         ball.vx += this.vx * 0.42;
         ball.vy += this.vy * 0.42;
       }
@@ -3709,9 +3753,18 @@ class Player {
   computeAI(ball, players) {
     const input = { x: 0, y: 0, wantKick: false, kickPower: 0.85, aim: null };
 
-    const ownGoalX = WORLD.courtRight; // 1180
-    const targetGoalX = WORLD.courtLeft; // 120
+    const ownGoalX = WORLD.courtRight;   // gol que a IA defende (direita)
+    const targetGoalX = WORLD.courtLeft; // gol que a IA ataca (esquerda)
     const midGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2;
+    const S = WORLD.ballSpeedScale || 1;
+
+    // Limites onde o corpo da IA consegue realmente chegar (evita alvo inalcancavel = travar)
+    const minPX = WORLD.courtLeft + this.radius + 2;
+    const maxPX = WORLD.courtRight - this.radius - 2;
+    const minPY = WORLD.courtTop + this.radius + 2;
+    const maxPY = WORLD.courtBottom - this.radius - 2;
+    const clampX = (v) => Math.max(minPX, Math.min(maxPX, v));
+    const clampY = (v) => Math.max(minPY, Math.min(maxPY, v));
 
     const dxToBall = ball.x - this.x;
     const dyToBall = ball.y - this.y;
@@ -3732,34 +3785,34 @@ class Player {
     this.aiPrevX = this.x;
     this.aiPrevY = this.y;
 
-    // Desvio anti-travamento suave e persistente (perpendicular a direcao da bola)
-    if (this.aiStuckTimer > 45) {
+    // Desvio anti-travamento suave (perpendicular a direcao da bola)
+    if (this.aiStuckTimer > 40) {
       const pl = distToBall || 1;
-      this.aiJitterX = (-dyToBall / pl) * 26 * this.aiJitterSide;
-      this.aiJitterY = (dxToBall / pl) * 26 * this.aiJitterSide;
+      this.aiJitterX = (-dyToBall / pl) * 34 * this.aiJitterSide;
+      this.aiJitterY = (dxToBall / pl) * 34 * this.aiJitterSide;
       this.aiStuckTimer = 0;
       this.aiJitterSide = -this.aiJitterSide;
     }
     if (Math.abs(this.aiJitterX) > 0.3 || Math.abs(this.aiJitterY) > 0.3) {
-      this.aiJitterX *= 0.94;
-      this.aiJitterY *= 0.94;
+      this.aiJitterX *= 0.95;
+      this.aiJitterY *= 0.95;
     } else {
       this.aiJitterX = 0;
       this.aiJitterY = 0;
     }
 
-    // Antecipacao da trajetoria da bola calibrada pelos atributos de inteligencia da fase
-    const lead = this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8;
-    const futureBallX = ball.x + ball.vx * lead;
-    const futureBallY = ball.y + ball.vy * lead;
+    // Antecipacao da trajetoria da bola (limitada para nao mirar fora da quadra)
+    const lead = (this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8) * S;
+    const futureBallY = Math.max(WORLD.courtTop + 20, Math.min(WORLD.courtBottom - 20, ball.y + ball.vy * lead));
 
     const opponentJustKicked = ball.lastTouchPlayer && ball.lastTouchPlayer !== this && ball.lastTouchPlayer.kickAnimTimer > 8;
 
     const ballSpeed = Math.hypot(ball.vx, ball.vy);
-    const ballAtRest = ballSpeed < 0.35;
+    const ballAtRest = ballSpeed < 1.2; // limiar maior: nao fica alternando atacar/defender com a bola quase parada
     const ballInOurHalf = ball.x > (WORLD.courtLeft + WORLD.courtRight) / 2;
-    const ballDangerous = ball.vx > 1.2 && ball.x > 800;
+    const ballDangerous = ball.vx > 1.5 && ball.x > 800;
     const ballPinnedRightWall = ball.x > WORLD.courtRight - (this.radius + ball.radius + 34);
+    const ballBehindUs = ball.x > this.x + 6; // bola entre a IA e o proprio gol
 
     const attackDist = this.aiAttackDist !== undefined ? this.aiAttackDist : 260;
 
@@ -3769,11 +3822,14 @@ class Player {
     } else if (ballAtRest || ballDangerous || distToBall < attackDist) {
       this.aiState = 'CHASE';
     }
-    if (ballAtRest) this.aiState = 'CHASE'; // bola morta no chao: sempre vai buscar
+    if (ballAtRest) this.aiState = 'CHASE';
 
-    const shouldAttackBall = (this.aiState === 'CHASE')
+    // Depois de chutar o bot recua um pouco (so volta antes se a bola ameaca o gol dele)
+    const recovering = this.kickCooldown > 0 && !ballDangerous;
+
+    const shouldAttackBall = !recovering && ((this.aiState === 'CHASE')
       || ballDangerous
-      || (!ballInOurHalf && distToBall < (attackDist + 160));
+      || (!ballInOurHalf && distToBall < (attackDist + 160)));
 
     let moveTargetX;
     let moveTargetY;
@@ -3781,17 +3837,22 @@ class Player {
 
     if (shouldAttackBall) {
       if (ballPinnedRightWall) {
-        // Bola presa na parede: posiciona a esquerda e limpa mirando o gol adversario
-        moveTargetX = ball.x - 20;
-        moveTargetY = ball.y + (ball.y < midGoalY ? -10 : 10);
+        // Bola colada na parede da direita: a IA nao consegue ficar atras dela.
+        // Vai para o lado (cima/baixo) oposto ao gol adversario e chuta em diagonal.
+        const room = (side) => side < 0 ? (ball.y - WORLD.courtTop) : (WORLD.courtBottom - ball.y);
+        let side = ball.y < midGoalY ? -1 : 1;
+        if (room(side) < 44) side = -side;
+        moveTargetX = ball.x - 4;
+        moveTargetY = ball.y + side * 30;
         cleanupKick = true;
-      } else if (ball.x > this.x + 6) {
-        // Bola ja passou pela IA: contorna para nao empurrar para o proprio gol
+      } else if (ballBehindUs) {
+        // Bola entre a IA e o proprio gol: contorna por fora (nunca empurra pro proprio gol)
+        const side = ball.y < midGoalY ? 1 : -1;
         moveTargetX = ball.x + 26;
-        moveTargetY = ball.y + (ball.y < midGoalY ? -30 : 30);
+        moveTargetY = ball.y + side * 34;
       } else {
         // Posiciona-se logo atras da bola, voltado ao gol adversario
-        moveTargetX = ball.x + 16;
+        moveTargetX = ball.x + 26;
         moveTargetY = futureBallY + (ball.y - midGoalY) * 0.10;
       }
     } else {
@@ -3800,27 +3861,30 @@ class Player {
       moveTargetY = Math.max(WORLD.goalYTop - 15, Math.min(WORLD.goalYBottom + 15, (futureBallY + midGoalY) / 2));
     }
 
-    // Aplica o desvio anti-travamento ao alvo
-    const targetX = moveTargetX + this.aiJitterX;
-    const targetY = moveTargetY + this.aiJitterY;
+    // Aplica o desvio anti-travamento e garante alvo alcancavel
+    const targetX = clampX(moveTargetX + this.aiJitterX);
+    const targetY = clampY(moveTargetY + this.aiJitterY);
 
     const toX = targetX - this.x;
     const toY = targetY - this.y;
     const len = Math.hypot(toX, toY);
 
-    // ZONA MORTA: precisa ser MAIOR que a derrapagem dos personagens rapidos
-    // (derrapagem ~ speed/0.34 ~ 9px). 15px garante que ele pare sem oscilar.
-    const STOP_DEADZONE = 15;
+    // ZONA MORTA maior que a derrapagem do personagem: chega, para e chuta sem tremer
+    const STOP_DEADZONE = (shouldAttackBall && distToBall < 90) ? 7 : 15;
     if (len > STOP_DEADZONE) {
       input.x = toX / len;
       input.y = toY / len;
     }
 
     // Chute: por tras da bola OU limpeza quando ela esta prensada na parede
-    const inKickRange = distToBall <= (this.radius + ball.radius + 20);
-    const canKickNormal = !cleanupKick || this.x <= ball.x - 4;
+    const inKickRange = distToBall <= (this.radius + ball.radius + 10);
+    const canKick = cleanupKick || !ballBehindUs;
 
-    if (inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKickNormal && !(ball.x > this.x + 6 && !cleanupKick)) {
+    // Tempo de reacao: precisa ficar encostado na bola alguns frames antes de chutar
+    const readyToKick = inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKick;
+    this.aiWindup = readyToKick ? this.aiWindup + 1 : 0;
+
+    if (readyToKick && this.aiWindup >= this.aiReactionFrames) {
       input.wantKick = true;
       input.kickPower = this.kickPowerDefault !== undefined ? this.kickPowerDefault : 0.85;
       if (cleanupKick) {
@@ -5264,6 +5328,13 @@ class GameEngine {
     this.tournamentRound = 0; // 0 = Oitavas, 1 = Quartas, 2 = Semis, 3 = Final
     this.isGoldenGoal = false;
 
+    // Dificuldade da CPU no modo 1 JOGADOR
+    this.difficulty = 'medium';
+    try {
+      const d = localStorage.getItem('beico_cpu_difficulty');
+      if (d && DIFFICULTIES[d]) this.difficulty = d;
+    } catch (e) {}
+
     // Time Selecionado da Taça das Favelas de Campinas
     this.selectedCampinasTeam = this.loadSelectedCampinasTeam();
     this.tournamentRounds = generateCampinasTournamentRounds(this.selectedCampinasTeam.id);
@@ -5726,9 +5797,26 @@ class GameEngine {
       audio.playClick();
       this.confirmTeamSelect();
     });
+    document.querySelectorAll('.ts-diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        this.difficulty = btn.dataset.diff;
+        try { localStorage.setItem('beico_cpu_difficulty', this.difficulty); } catch (e) {}
+        this.renderDifficulty();
+      });
+    });
     const back = () => { audio.playClick(); this.closeTeamSelect(true); };
     on('btn-team-select-back', back);
     on('btn-close-team-select', back);
+  }
+
+  renderDifficulty() {
+    const box = document.getElementById('ts-difficulty');
+    if (box) box.classList.toggle('hidden', this.pickMode !== '1P');
+    document.querySelectorAll('.ts-diff-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === this.difficulty);
+    });
   }
 
   openTeamSelect(mode) {
@@ -5757,6 +5845,7 @@ class GameEngine {
     modal.classList.remove('hidden');
     modal.classList.add('active');
     this.renderTeamSelect();
+    this.renderDifficulty();
   }
 
   renderTeamSelect() {
@@ -5921,6 +6010,7 @@ class GameEngine {
   }
 
   startTournamentMatch(roundIndex = 0) {
+    this.kickoffTeam = null;
     this.isTournament = true;
     const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
     this.tournamentRound = Math.min(Math.max(0, roundIndex), rounds.length - 1);
@@ -5956,6 +6046,7 @@ class GameEngine {
     p2.aiLeadFrames = opp.aiLeadFrames;
     p2.aiAttackDist = opp.aiAttackDist;
     p2.kickPowerDefault = opp.kickPowerDefault;
+    p2.aiReactionFrames = [14, 10, 7, 5][this.tournamentRound] || 10;
 
     // Atualização dos nomes e ícones no HUD do placar
     if (this.p1ScoreName) this.p1ScoreName.textContent = myTeam.shortName || myTeam.name;
@@ -6005,6 +6096,7 @@ class GameEngine {
   }
 
   startMatch(mode = '1P') {
+    this.kickoffTeam = null;
     this.isTournament = false;
     this.isGoldenGoal = false;
     this.gameMode = mode;
@@ -6020,11 +6112,12 @@ class GameEngine {
 
     // Times escolhidos na tela de seleção
     const teams = this.getFriendlyTeams();
+    const diff0 = DIFFICULTIES[this.difficulty] || DIFFICULTIES.medium;
     if (this.p1ScoreName) this.p1ScoreName.textContent = teams.t1.shortName;
     if (this.p1ScoreSub) this.p1ScoreSub.textContent = mode === '2P' ? 'JOGADOR 1' : 'VOCÊ';
     if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = teams.t1.avatar;
     if (this.rivalScoreName) this.rivalScoreName.textContent = teams.t2.shortName;
-    if (this.rivalScoreSub) this.rivalScoreSub.textContent = mode === '2P' ? 'JOGADOR 2' : 'CPU';
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = mode === '2P' ? 'JOGADOR 2' : ('CPU • ' + diff0.label);
     if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = teams.t2.avatar;
 
     // Atualizar jogadores
@@ -6039,11 +6132,13 @@ class GameEngine {
 
     this.applyPlayerTeamAppearance(p1, teams.t1);
     this.applyPlayerTeamAppearance(p2, teams.t2);
-    p2.speed = 1.9;
-    p2.kickPowerMax = 9.0;
-    p2.aiLeadFrames = 8;
-    p2.aiAttackDist = 260;
-    p2.kickPowerDefault = 0.85;
+    const diff = (mode === '1P') ? (DIFFICULTIES[this.difficulty] || DIFFICULTIES.medium) : DIFFICULTIES.medium;
+    p2.speed = diff.speed;
+    p2.kickPowerMax = diff.kickPowerMax;
+    p2.aiLeadFrames = diff.aiLeadFrames;
+    p2.aiAttackDist = diff.aiAttackDist;
+    p2.kickPowerDefault = diff.kickPowerDefault;
+    p2.aiReactionFrames = diff.aiReactionFrames;
 
     if (mode === '2P') {
       p2.isControlled = true;
@@ -6147,7 +6242,16 @@ class GameEngine {
     for (const player of this.players) {
       player.reset();
     }
-    this.ball.reset(WORLD.width / 2, (WORLD.courtTop + WORLD.courtBottom) / 2);
+    // Saida de bola: quem tomou o gol recomeca com a bola; no inicio da partida fica no centro
+    let bx = WORLD.width / 2;
+    const by = (WORLD.courtTop + WORLD.courtBottom) / 2;
+    const starter = this.kickoffTeam ? this.players.find(p => p.team === this.kickoffTeam) : null;
+    if (starter) {
+      bx = starter.homeX + (starter.team === 'beico' ? 60 : -60);
+    }
+    this.ballStartX = bx;
+    this.ballStartY = by;
+    this.ball.reset(bx, by);
   }
 
   updateTimerDisplay() {
@@ -6184,6 +6288,8 @@ class GameEngine {
     const myTeam = (this.isTournament && this.selectedCampinasTeam) ? this.selectedCampinasTeam : null;
     const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
     const oppTeam = (this.isTournament && rounds[this.tournamentRound]) ? rounds[this.tournamentRound].opponent : null;
+
+    this.kickoffTeam = (scoringTeam === 'beico') ? 'rivais' : 'beico';
 
     if (scoringTeam === 'beico') {
       this.scoreBeico++;
@@ -6372,6 +6478,7 @@ class GameEngine {
   }
 
   returnToMenu() {
+    this.kickoffTeam = null;
     this.state = 'MENU';
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.isTournament = false;
@@ -6459,8 +6566,8 @@ class GameEngine {
         player.kickCooldown = 0;
         player.facingAngle = player.team === 'beico' ? 0 : Math.PI;
       }
-      this.ball.x = WORLD.width / 2;
-      this.ball.y = (WORLD.courtTop + WORLD.courtBottom) / 2;
+      this.ball.x = this.ballStartX !== undefined ? this.ballStartX : WORLD.width / 2;
+      this.ball.y = this.ballStartY !== undefined ? this.ballStartY : (WORLD.courtTop + WORLD.courtBottom) / 2;
       this.ball.vx = 0;
       this.ball.vy = 0;
       this.ball.vz = 0;
