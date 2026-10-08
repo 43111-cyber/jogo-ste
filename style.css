@@ -2061,3 +2061,6 @@ body.penalties .bottom-hint, body.penalties .power-hud { display: none !importan
 .celebration-banner.happy .celebration-text { color: #4ade80; }
 .celebration-banner.trophy .celebration-text { color: #ffd400; animation: pulseGlow 0.5s infinite alternate ease-in-out; }
 .celebration-sub { display: inline-block; margin-top: 8px; font-family: var(--font-graffiti); font-size: clamp(1rem, 2.4vw, 1.6rem); color: #fff; background: #000; padding: 6px 18px; border-radius: 8px; border: 2px solid var(--beico-yellow); }
+
+/* Botões escondidos de verdade (ex.: tela de resultado do torneio) */
+.btn-street.hidden { display: none !important; }
