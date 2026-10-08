@@ -353,7 +353,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#ffffff',
       hairStyle: 'buzz',
       hairColor: '#171717',
-      speed: 1.68,
+      speed: 2.55,
       kickPowerMax: 10.5,
       aiLeadFrames: 3,
       aiAttackDist: 200,
@@ -380,7 +380,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#0f172a',
       hairStyle: 'dreads',
       hairColor: '#0f172a',
-      speed: 1.86,
+      speed: 2.80,
       kickPowerMax: 12.5,
       aiLeadFrames: 6,
       aiAttackDist: 270,
@@ -407,7 +407,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#4338ca',
       hairStyle: 'blonde',
       hairColor: '#fef08a',
-      speed: 2.04,
+      speed: 3.00,
       kickPowerMax: 14.5,
       aiLeadFrames: 9,
       aiAttackDist: 340,
@@ -434,7 +434,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#18181b',
       hairStyle: 'afro',
       hairColor: '#eab308', // Dourado
-      speed: 2.22,
+      speed: 3.25,
       kickPowerMax: 14.5,
       aiLeadFrames: 12,
       aiAttackDist: 430,
@@ -812,7 +812,7 @@ class Player {
     this.vy = 0;
     this.facingAngle = config.team === 'beico' ? 0 : Math.PI;
     this.radius = 18; // Raio físico do jogador
-    this.speed = config.speed !== undefined ? config.speed : 2.04; // Cadenciado para o jogador ou calibrado por fase
+    this.speed = config.speed !== undefined ? config.speed : 3.0; // AUMENTADO (antes 2.04): bonecos mais rapidos
     this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 14.5;
     this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 5.5;
 
@@ -839,6 +839,15 @@ class Player {
     this.isChargingKick = false;
     this.kickCharge = 0; // 0.0 a 1.0
     this.prevKickHeld = false;
+
+    // Memoria da IA (anti-travamento)
+    this.aiState = 'CHASE';
+    this.aiStuckTimer = 0;
+    this.aiPrevX = this.x;
+    this.aiPrevY = this.y;
+    this.aiJitterX = 0;
+    this.aiJitterY = 0;
+    this.aiLastLen = 0;
   }
 
   reset() {
@@ -853,6 +862,15 @@ class Player {
     this.isChargingKick = false;
     this.kickCharge = 0;
     this.prevKickHeld = false;
+
+    // Zera a memoria da IA a cada reinicio de jogada
+    this.aiState = 'CHASE';
+    this.aiStuckTimer = 0;
+    this.aiPrevX = this.x;
+    this.aiPrevY = this.y;
+    this.aiJitterX = 0;
+    this.aiJitterY = 0;
+    this.aiLastLen = 0;
   }
 
   update(inputKeys, ball, players, particles) {
@@ -918,7 +936,7 @@ class Player {
       moveX = aiInput.x;
       moveY = aiInput.y;
       if (aiInput.wantKick) {
-        this.executeInstantKick(ball, particles, aiInput.kickPower || 0.85);
+        this.executeInstantKick(ball, particles, aiInput.kickPower || 0.85, aiInput.aim || null);
       }
     }
 
@@ -931,9 +949,9 @@ class Player {
       const targetVx = moveX * this.speed;
       const targetVy = moveY * this.speed;
       // Aceleração suave e cadência de passos sincronizada com velocidade lenta
-      this.vx += (targetVx - this.vx) * 0.28;
-      this.vy += (targetVy - this.vy) * 0.28;
-      this.walkCycle += 0.12; // Passos suaves e cadenciados
+      this.vx += (targetVx - this.vx) * 0.34;
+      this.vy += (targetVy - this.vy) * 0.34;
+      this.walkCycle += 0.17; // Passos mais rapidos acompanhando a nova velocidade
 
       // Soltar poeira do asfalto ao correr
       if (Math.random() < 0.12) {
@@ -1047,8 +1065,8 @@ class Player {
     }
   }
 
-  // Chute executado pela IA (Caveira)
-  executeInstantKick(ball, particles, powerPct = 0.85) {
+  // Chute executado pela IA (Caveira) — aceita mira opcional (limpeza de bola na parede)
+  executeInstantKick(ball, particles, powerPct = 0.85, aim = null) {
     if (this.kickCooldown > 0) return;
 
     const dx = ball.x - this.x;
@@ -1061,8 +1079,16 @@ class Player {
       const maxPower = this.kickPowerMax;
       const totalPower = minPower + powerPct * (maxPower - minPower);
 
-      let dirX = dx / dist;
-      let dirY = dy / dist;
+      let dirX;
+      let dirY;
+      if (aim) {
+        const aimLen = Math.hypot(aim.x - ball.x, aim.y - ball.y) || 1;
+        dirX = (aim.x - ball.x) / aimLen;
+        dirY = (aim.y - ball.y) / aimLen;
+      } else {
+        dirX = dx / dist;
+        dirY = dy / dist;
+      }
 
       // Descola imediatamente a bola do corpo da IA
       ball.x = this.x + dirX * (this.radius + ball.radius + 6);
@@ -1074,10 +1100,14 @@ class Player {
       ball.lastTouchPlayer = this;
 
       this.kickAnimTimer = 16;
-      this.kickCooldown = 25; // Cooldown equilibrado na IA
+      this.kickCooldown = 16; // Cooldown menor: a IA joga mais solta e não trava
       audio.playKick(powerPct);
       if (game) game.triggerShake(powerPct > 0.75 ? 6 : 3);
       particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 10);
+    } else {
+      // Chute no vácuo: nunca deixa a IA travada esperando alcance
+      this.kickAnimTimer = 6;
+      this.kickCooldown = 0;
     }
   }
 
@@ -1129,8 +1159,10 @@ class Player {
   }
 
   // Inteligência Artificial pura para 1v1 estilo Beatball
+  // Corrigida: nunca mais "fica parado". A IA persegue a bola morta, tem histerese
+  // para não oscilar na fronteira, watchdog anti-travamento e limpa bola na parede.
   computeAI(ball, players) {
-    const input = { x: 0, y: 0, wantKick: false, kickPower: 0.85 };
+    const input = { x: 0, y: 0, wantKick: false, kickPower: 0.85, aim: null };
 
     const ownGoalX = WORLD.courtRight; // 1180
     const targetGoalX = WORLD.courtLeft; // 120
@@ -1140,6 +1172,38 @@ class Player {
     const dyToBall = ball.y - this.y;
     const distToBall = Math.hypot(dxToBall, dyToBall);
 
+    // --- MEMÓRIA DA IA (ANTI-TRAVAMENTO) ---
+    if (this.aiState === undefined) this.aiState = 'CHASE';
+    if (this.aiStuckTimer === undefined) this.aiStuckTimer = 0;
+    if (this.aiJitterX === undefined) this.aiJitterX = 0;
+    if (this.aiJitterY === undefined) this.aiJitterY = 0;
+    if (this.aiPrevX === undefined) { this.aiPrevX = this.x; this.aiPrevY = this.y; }
+
+    // Watchdog: se a IA mandou andar mas quase não saiu do lugar, destrava
+    const movedSinceLast = Math.hypot(this.x - this.aiPrevX, this.y - this.aiPrevY);
+    const wantedToMove = (this.aiLastLen !== undefined && this.aiLastLen > 0);
+    if (wantedToMove && movedSinceLast < 0.25) {
+      this.aiStuckTimer++;
+    } else {
+      this.aiStuckTimer = Math.max(0, this.aiStuckTimer - 2);
+    }
+    this.aiPrevX = this.x;
+    this.aiPrevY = this.y;
+
+    if (this.aiStuckTimer > 30) {
+      // Sorteia um desvio lateral por alguns frames e volta a perseguir a bola
+      this.aiJitterX = (Math.random() - 0.5) * 1.8;
+      this.aiJitterY = (Math.random() < 0.5 ? -1 : 1) * 1.8;
+      this.aiStuckTimer = 0;
+    }
+    if (Math.abs(this.aiJitterX) > 0.02 || Math.abs(this.aiJitterY) > 0.02) {
+      this.aiJitterX *= 0.90;
+      this.aiJitterY *= 0.90;
+    } else {
+      this.aiJitterX = 0;
+      this.aiJitterY = 0;
+    }
+
     // Antecipação da trajetória da bola calibrada pelos atributos de inteligência da fase
     const lead = this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8;
     const futureBallX = ball.x + ball.vx * lead;
@@ -1148,66 +1212,88 @@ class Player {
     // Checa se o adversário acabou de chutar a bola para não anular o chute no mesmo frame
     const opponentJustKicked = ball.lastTouchPlayer && ball.lastTouchPlayer !== this && ball.lastTouchPlayer.kickAnimTimer > 8;
 
-    // Situação 1: A bola está atrás do bot (perigo iminente de gol contra)
-    if (ball.x > this.x - 20) {
-      const evadeY = (ball.y < midGoalY) ? ball.y + 60 : ball.y - 60;
-      const retreatX = Math.min(ownGoalX - 50, ball.x + 80);
-      const toRetreatX = retreatX - this.x;
-      const toRetreatY = evadeY - this.y;
-      const len = Math.hypot(toRetreatX, toRetreatY);
-      if (len > 5) {
-        input.x = toRetreatX / len;
-        input.y = toRetreatY / len;
-      }
-      return input;
-    }
-
-    // Situação 2: Defesa e Ataque 1v1
+    const ballSpeed = Math.hypot(ball.vx, ball.vy);
+    const ballAtRest = ballSpeed < 0.35; // Bola praticamente parada no chão
     const ballInOurHalf = ball.x > (WORLD.courtLeft + WORLD.courtRight) / 2;
     const ballDangerous = ball.vx > 1.2 && ball.x > 800;
 
-    const guardX = Math.min(ownGoalX - 80, Math.max(ownGoalX - 260, ball.x + 160));
-    const guardY = Math.max(WORLD.goalYTop - 15, Math.min(WORLD.goalYBottom + 15, (futureBallY + midGoalY) / 2));
+    // Bola encurralada na parede direita: a IA não tem como se colocar "atrás" dela,
+    // então se posiciona à esquerda e limpa a bola com um chute mirado no gol adversário.
+    const ballPinnedRightWall = ball.x > WORLD.courtRight - (this.radius + ball.radius + 34);
 
     const attackDist = this.aiAttackDist !== undefined ? this.aiAttackDist : 260;
-    const shouldAttackBall = (distToBall < attackDist) || ballDangerous || (!ballInOurHalf && distToBall < (attackDist + 160));
+
+    // HISTERESE: entra em ataque com um raio e só sai com um raio bem menor.
+    // Sem isso, a IA oscilava na fronteira e ficava tremendo no lugar (parecia parada).
+    const enterDist = attackDist;
+    const leaveDist = attackDist * 0.65;
+    if (this.aiState === 'CHASE') {
+      if (!ballAtRest && !ballDangerous && distToBall > leaveDist) this.aiState = 'DEFEND';
+    } else if (ballAtRest || ballDangerous || distToBall < enterDist) {
+      this.aiState = 'CHASE';
+    }
+    // Bola morta no chão = a IA SEMPRE vai buscar (não fica plantada olhando)
+    if (ballAtRest) this.aiState = 'CHASE';
+
+    const shouldAttackBall = (this.aiState === 'CHASE')
+      || ballDangerous
+      || (!ballInOurHalf && distToBall < (attackDist + 160));
+
+    let moveTargetX;
+    let moveTargetY;
+    let dribbleBehindBall = true;
 
     if (shouldAttackBall) {
-      // Posiciona-se logo atrás da bola em direção ao gol alvo
-      const attackTargetX = ball.x + 22;
-      const attackTargetY = ball.y + (ball.y - midGoalY) * 0.12;
-
-      const toTargetX = attackTargetX - this.x;
-      const toTargetY = attackTargetY - this.y;
-      const len = Math.hypot(toTargetX, toTargetY);
-      if (len > 4) {
-        input.x = toTargetX / len;
-        input.y = toTargetY / len;
+      // Bola já passou pela IA rumo ao próprio gol: entra pelo lado do gol para limpar
+      const ballPastBot = ball.x > this.x + 6;
+      if (ballPinnedRightWall) {
+        moveTargetX = ball.x - (this.radius + ball.radius + 8);
+        dribbleBehindBall = false;
+      } else if (ballPastBot) {
+        moveTargetX = ball.x + 34;
+        moveTargetY = ball.y + (ball.y < midGoalY ? -34 : 34); // desvia por fora da bola
+        dribbleBehindBall = false;
+      } else {
+        moveTargetX = ball.x + 22;
       }
-
-      // Chute calibrado estilo Beatball com checagem de cooldown e força personalizada da fase
-      const inKickRange = distToBall <= (this.radius + ball.radius + 18);
-      if (inKickRange && this.x > ball.x - 4 && this.kickCooldown <= 0 && !opponentJustKicked) {
-        input.wantKick = true;
-        const pwr = this.kickPowerDefault !== undefined ? this.kickPowerDefault : (distToBall < 200 ? 0.95 : 0.75);
-        input.kickPower = pwr;
+      if (moveTargetY === undefined) {
+        moveTargetY = futureBallY + (ball.y - midGoalY) * 0.12;
       }
     } else {
-      // Guarda defensiva
-      const toGuardX = guardX - this.x;
-      const toGuardY = guardY - this.y;
-      const len = Math.hypot(toGuardX, toGuardY);
-      if (len > 6) {
-        input.x = toGuardX / len;
-        input.y = toGuardY / len;
-      }
+      // Guarda defensiva entre a bola e o próprio gol
+      moveTargetX = Math.min(ownGoalX - 80, Math.max(ownGoalX - 260, ball.x + 160));
+      moveTargetY = Math.max(WORLD.goalYTop - 15, Math.min(WORLD.goalYBottom + 15, (futureBallY + midGoalY) / 2));
+    }
 
-      if (distToBall <= (this.radius + ball.radius + 18) && this.x > ball.x - 4 && this.kickCooldown <= 0 && !opponentJustKicked) {
-        input.wantKick = true;
-        input.kickPower = this.kickPowerDefault !== undefined ? this.kickPowerDefault : 0.85;
+    let toTargetX = (moveTargetX - this.x) + this.aiJitterX * 26;
+    let toTargetY = (moveTargetY - this.y) + this.aiJitterY * 26;
+    const len = Math.hypot(toTargetX, toTargetY);
+
+    if (len > 4) {
+      input.x = toTargetX / len;
+      input.y = toTargetY / len;
+    } else if (distToBall > (this.radius + ball.radius + 4)) {
+      // Fallback anti-travamento: alvo degenerado mas a bola ainda está longe -> vai nela
+      const fbLen = distToBall || 1;
+      input.x = dxToBall / fbLen;
+      input.y = dyToBall / fbLen;
+    }
+
+    // Chute: rota normal (por trás da bola) OU limpeza quando ela está prensada na parede
+    const inKickRange = distToBall <= (this.radius + ball.radius + 20);
+    const canKickNormal = dribbleBehindBall || this.x > ball.x - 4;
+
+    if (inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKickNormal) {
+      input.wantKick = true;
+      input.kickPower = this.kickPowerDefault !== undefined ? this.kickPowerDefault : 0.85;
+      if (!dribbleBehindBall) {
+        // Limpeza: mira o gol adversário para não empurrar a bola para o próprio gol
+        input.aim = { x: targetGoalX, y: midGoalY + (Math.random() - 0.5) * 70 };
       }
     }
 
+    input._len = Math.hypot(input.x, input.y);
+    this.aiLastLen = input._len;
     return input;
   }
 
@@ -3018,7 +3104,7 @@ class GameEngine {
     const p1 = this.players[0];
     p1.isControlled = true;
     p1.controlId = 1;
-    p1.speed = 2.04;
+    p1.speed = 3.0;
     p1.kickPowerMax = 14.5;
     p1.kickPowerMin = 5.5;
 
@@ -3105,7 +3191,7 @@ class GameEngine {
 
     p1.isControlled = true;
     p1.controlId = 1;
-    p1.speed = 2.04;
+    p1.speed = 3.0;
     p1.kickPowerMax = 14.5;
     p1.kickPowerMin = 5.5;
 
@@ -3116,7 +3202,7 @@ class GameEngine {
     p2.hairStyle = 'buzz';
     p2.hairColor = '#1c1917';
     p2.number = '9';
-    p2.speed = 2.04;
+    p2.speed = 3.0;
     p2.kickPowerMax = 14.5;
     p2.aiLeadFrames = 8;
     p2.aiAttackDist = 260;
