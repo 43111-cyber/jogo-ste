@@ -353,7 +353,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#ffffff',
       hairStyle: 'buzz',
       hairColor: '#171717',
-      speed: 1.15,
+      speed: 1.40,
       kickPowerMax: 10.5,
       aiLeadFrames: 3,
       aiAttackDist: 200,
@@ -380,7 +380,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#0f172a',
       hairStyle: 'dreads',
       hairColor: '#0f172a',
-      speed: 1.30,
+      speed: 1.55,
       kickPowerMax: 12.5,
       aiLeadFrames: 6,
       aiAttackDist: 270,
@@ -407,7 +407,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#4338ca',
       hairStyle: 'blonde',
       hairColor: '#fef08a',
-      speed: 1.42,
+      speed: 1.70,
       kickPowerMax: 14.5,
       aiLeadFrames: 9,
       aiAttackDist: 340,
@@ -434,7 +434,7 @@ const TOURNAMENT_ROUNDS = [
       shortsColor: '#18181b',
       hairStyle: 'afro',
       hairColor: '#eab308', // Dourado
-      speed: 1.55,
+      speed: 1.85,
       kickPowerMax: 14.5,
       aiLeadFrames: 12,
       aiAttackDist: 430,
@@ -812,7 +812,7 @@ class Player {
     this.vy = 0;
     this.facingAngle = config.team === 'beico' ? 0 : Math.PI;
     this.radius = 18; // Raio físico do jogador
-    this.speed = config.speed !== undefined ? config.speed : 1.40; // Cadenciado para o jogador ou calibrado por fase
+    this.speed = config.speed !== undefined ? config.speed : 1.70; // Cadenciado para o jogador ou calibrado por fase
     this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 14.5;
     this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 5.5;
 
@@ -933,7 +933,7 @@ class Player {
       // Aceleração suave e cadência de passos sincronizada com velocidade lenta
       this.vx += (targetVx - this.vx) * 0.28;
       this.vy += (targetVy - this.vy) * 0.28;
-      this.walkCycle += 0.08; // Passos suaves e cadenciados
+      this.walkCycle += 0.10; // Passos suaves e cadenciados
 
       // Soltar poeira do asfalto ao correr
       if (Math.random() < 0.12) {
@@ -3018,7 +3018,7 @@ class GameEngine {
     const p1 = this.players[0];
     p1.isControlled = true;
     p1.controlId = 1;
-    p1.speed = 1.40;
+    p1.speed = 1.70;
     p1.kickPowerMax = 14.5;
     p1.kickPowerMin = 5.5;
 
@@ -3105,7 +3105,7 @@ class GameEngine {
 
     p1.isControlled = true;
     p1.controlId = 1;
-    p1.speed = 1.40;
+    p1.speed = 1.70;
     p1.kickPowerMax = 14.5;
     p1.kickPowerMin = 5.5;
 
@@ -3116,7 +3116,7 @@ class GameEngine {
     p2.hairStyle = 'buzz';
     p2.hairColor = '#1c1917';
     p2.number = '9';
-    p2.speed = 1.40;
+    p2.speed = 1.70;
     p2.kickPowerMax = 14.5;
     p2.aiLeadFrames = 8;
     p2.aiAttackDist = 260;
