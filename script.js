@@ -3236,6 +3236,7 @@ class GameEngine {
     // Atualiza interface do torneio
     this.updateCampinasTeamSelectorUI();
     this.updateTournamentBracketUI();
+    this.updateTourneyRankLine();
     audio.playClick();
   }
 
@@ -3519,6 +3520,21 @@ class GameEngine {
       });
     }
 
+    // Ranking global dos times
+    const on2 = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    on2('btn-ranking', () => { audio.init(); audio.playClick(); this.openRanking(); });
+    on2('btn-tourney-ranking', () => { audio.playClick(); this.openRanking(); });
+    on2('btn-close-ranking', () => { audio.playClick(); this.closeRanking(); });
+    on2('btn-ranking-back', () => { audio.playClick(); this.closeRanking(); });
+    on2('btn-ranking-play', () => {
+      audio.init(); audio.playClick();
+      const modal = document.getElementById('ranking-modal');
+      modal.classList.remove('active');
+      modal.classList.add('hidden');
+      this.returnToMenu();
+      this.openTournamentModal();
+    });
+
     // Como Jogar
     document.getElementById('btn-how-to-play').addEventListener('click', () => {
       audio.init();
@@ -3730,8 +3746,17 @@ class GameEngine {
     this.mainMenu.classList.add('hidden');
     this.tournamentModal.classList.remove('hidden');
     this.tournamentModal.classList.add('active');
+    if (this.tournamentWon) {
+      // Já foi campeão: um novo torneio começa do zero, com novo chaveamento
+      this.tournamentWon = false;
+      this.tournamentRound = 0;
+      const t = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
+      this.tournamentRounds = generateCampinasTournamentRounds(t.id);
+      TOURNAMENT_ROUNDS = this.tournamentRounds;
+    }
     this.initCampinasTeamSelector();
     this.updateTournamentBracketUI();
+    this.updateTourneyRankLine();
   }
 
   closeTournamentModal() {
@@ -4250,6 +4275,10 @@ class GameEngine {
     const btnRetry = document.getElementById('btn-tourney-retry');
     const btnMenu = document.getElementById('btn-tourney-menu');
     if (btnMenu) btnMenu.classList.remove('hidden');
+    const btnRank = document.getElementById('btn-tourney-ranking');
+    if (btnRank) btnRank.classList.add('hidden');
+    const rankInfo = document.getElementById('tourney-rank-info');
+    if (rankInfo) rankInfo.classList.add('hidden');
 
     if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreText('beico');
     if (scoreRivalEl) scoreRivalEl.textContent = this.scoreText('rivais');
@@ -4280,6 +4309,9 @@ class GameEngine {
 
         btnNext.classList.remove('hidden');
         if (btnNextText) btnNextText.textContent = 'NOVO TORNEIO 🏆';
+        if (btnRank) btnRank.classList.remove('hidden');
+        this.tournamentWon = true;
+        this.recordChampion(myTeam); // soma 1 título pro time no ranking global
         btnRetry.classList.add('hidden');
       } else {
         // AVANÇOU PARA A PRÓXIMA FASE!
@@ -4322,6 +4354,144 @@ class GameEngine {
 
     this.tournamentResultModal.classList.remove('hidden');
     this.tournamentResultModal.classList.add('active');
+  }
+
+  // ====================================================================
+  // RANKING GLOBAL DA TAÇA DAS FAVELAS (títulos por time, guardado no servidor)
+  // ====================================================================
+  async fetchRanking() {
+    try {
+      const r = await fetch('/api/ranking', { cache: 'no-store' });
+      if (!r.ok) throw new Error('http ' + r.status);
+      return await r.json();
+    } catch (e) {
+      return null; // servidor offline / aberto como arquivo
+    }
+  }
+
+  rankInfoOf(data, teamId) {
+    const i = data.ranking.findIndex(r => r.id === teamId);
+    return i < 0 ? { pos: 0, wins: 0 } : { pos: i + 1, wins: data.ranking[i].wins };
+  }
+
+  teamNameById(id) {
+    const t = CAMPINAS_FAVELA_TEAMS.find(x => x.id === id);
+    return t ? t.name : id;
+  }
+
+  async updateTourneyRankLine() {
+    const el = document.getElementById('tourney-rank-line');
+    const team = this.selectedCampinasTeam;
+    if (!el || !team) return;
+    const data = await this.fetchRanking();
+    if (!this.selectedCampinasTeam || this.selectedCampinasTeam.id !== team.id) return; // trocou de time enquanto carregava
+    if (!data) { el.textContent = ''; return; }
+    const me = this.rankInfoOf(data, team.id);
+    const leader = data.ranking[0];
+    if (me.pos === 1) {
+      el.textContent = `👑 ${team.name.toUpperCase()} É O TOP 1 DO RANKING (${me.wins} ${me.wins === 1 ? 'título' : 'títulos'})! Defenda a liderança!`;
+    } else if (me.pos > 0) {
+      el.textContent = `🏅 ${team.name.toUpperCase()} É #${me.pos} NO RANKING (${me.wins} ${me.wins === 1 ? 'título' : 'títulos'}) • Líder: ${this.teamNameById(leader.id)} (${leader.wins})`;
+    } else if (leader) {
+      el.textContent = `🏅 ${team.name.toUpperCase()} AINDA NÃO TEM TÍTULOS • Líder: ${this.teamNameById(leader.id)} (${leader.wins}). Seja campeão e suba no ranking!`;
+    } else {
+      el.textContent = `🏅 NINGUÉM FOI CAMPEÃO AINDA! Seja o primeiro e coloque o ${team.name.toUpperCase()} no TOP 1!`;
+    }
+  }
+
+  async openRanking() {
+    this.mainMenu.classList.remove('active');
+    this.mainMenu.classList.add('hidden');
+    if (this.tournamentResultModal) {
+      this.tournamentResultModal.classList.remove('active');
+      this.tournamentResultModal.classList.add('hidden');
+    }
+    const modal = document.getElementById('ranking-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    const status = document.getElementById('ranking-status');
+    const list = document.getElementById('ranking-list');
+    status.className = 'ranking-status';
+    status.textContent = 'Carregando ranking...';
+    list.innerHTML = '';
+    const data = await this.fetchRanking();
+    if (!modal.classList.contains('active')) return; // fechou antes de carregar
+    this.renderRanking(data);
+  }
+
+  renderRanking(data) {
+    const status = document.getElementById('ranking-status');
+    const list = document.getElementById('ranking-list');
+    if (!data) {
+      status.className = 'ranking-status error';
+      status.textContent = '⚠️ Não foi possível carregar o ranking. Abra o jogo pelo servidor (node server.js).';
+      list.innerHTML = '';
+      return;
+    }
+    const mineId = this.selectedCampinasTeam ? this.selectedCampinasTeam.id : null;
+    const byId = new Map(CAMPINAS_FAVELA_TEAMS.map(t => [t.id, t]));
+    const ranked = data.ranking.map(r => ({ team: byId.get(r.id), wins: r.wins })).filter(r => r.team);
+    const rankedIds = new Set(ranked.map(r => r.team.id));
+    const rest = CAMPINAS_FAVELA_TEAMS.filter(t => !rankedIds.has(t.id))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      .map(t => ({ team: t, wins: 0 }));
+
+    status.className = 'ranking-status';
+    status.textContent = data.total > 0
+      ? `🏆 ${data.total} ${data.total === 1 ? 'título conquistado' : 'títulos conquistados'} na Taça das Favelas de Campinas`
+      : 'Ninguém foi campeão ainda — seja o primeiro e coloque seu time no TOP 1!';
+
+    const medals = ['🥇', '🥈', '🥉'];
+    list.innerHTML = ranked.concat(rest).map((r, i) => {
+      const t = r.team;
+      const hasWins = r.wins > 0;
+      const pos = hasWins ? (medals[i] || `${i + 1}º`) : '—';
+      const cls = ['rk-row', hasWins ? '' : 'rk-empty', t.id === mineId ? 'rk-mine' : '', (hasWins && i === 0) ? 'rk-top1' : ''].join(' ').replace(/\s+/g, ' ').trim();
+      return `<li class="${cls}" data-team-id="${t.id}">
+        <span class="rk-pos">${pos}</span>
+        <span class="rk-avatar" style="background:${t.shirtColor}; border-color:${t.shortsColor};">${t.avatar}</span>
+        <span class="rk-name">${t.name}${t.id === mineId ? '<span class="rk-you">SEU TIME</span>' : ''}</span>
+        <span class="rk-wins">${r.wins}<small>${r.wins === 1 ? 'TÍTULO' : 'TÍTULOS'}</small></span>
+      </li>`;
+    }).join('');
+
+    const mine = list.querySelector('.rk-mine');
+    if (mine) mine.scrollIntoView({ block: 'nearest' });
+  }
+
+  closeRanking() {
+    const modal = document.getElementById('ranking-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.classList.add('hidden');
+    }
+    this.returnToMenu();
+  }
+
+  // Campeão: registra o título do time no ranking global e mostra a posição
+  async recordChampion(team) {
+    const box = document.getElementById('tourney-rank-info');
+    const show = (txt) => { if (box) { box.textContent = txt; box.classList.remove('hidden'); } };
+    show('🏅 Registrando o título no ranking...');
+    try {
+      const r = await fetch('/api/champion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId: team.id })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 429) { show('🏅 Seu título já foi registrado há pouco. Confira o ranking!'); return; }
+      if (!r.ok || !d.ok) throw new Error('falha');
+      const tit = d.wins === 1 ? 'título' : 'títulos';
+      if (d.position === 1) {
+        show(`👑 ${team.name.toUpperCase()} É O TOP 1 DO RANKING com ${d.wins} ${tit}!`);
+      } else {
+        const lead = d.ranking[0];
+        show(`🏅 ${team.name.toUpperCase()} agora é #${d.position} no ranking com ${d.wins} ${tit}. Líder: ${this.teamNameById(lead.id)} (${lead.wins}). Bora subir!`);
+      }
+    } catch (e) {
+      show('⚠️ Não consegui registrar o título no ranking (servidor offline). Abra o jogo pelo servidor: node server.js');
+    }
   }
 
   returnToMenu() {
