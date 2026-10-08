@@ -1997,6 +1997,27 @@ html, body, #game-container { background-color: #000; }
   .ts-grid { max-height: 26vh; }
 }
 
+
+/* ===== MENU: FAVELA NO FUNDO + TÍTULO "BEIÇO STREET" ===== */
+#main-menu { background: #1a0b2e; backdrop-filter: none; overflow: hidden; }
+#main-menu::before { z-index: 1; }
+.menu-backdrop { position: absolute; inset: 0; z-index: 0; }
+.menu-backdrop svg { width: 100%; height: 100%; display: block; }
+.menu-content { z-index: 2; }
+.menu-title {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0.18em 0.3em;
+  line-height: 0.95; margin: 0 0 6px; transform: rotate(-2deg);
+  filter: drop-shadow(0 6px 0 rgba(0,0,0,0.55));
+}
+.menu-title .mt-1, .menu-title .mt-2 {
+  font-size: clamp(3rem, 11vw, 6.8rem); -webkit-text-stroke: 4px #000; paint-order: stroke fill;
+}
+.menu-title .mt-1 { font-family: var(--font-title); color: #ffd400; text-shadow: 5px 5px 0 #00a859; }
+.menu-title .mt-2 { font-family: var(--font-graffiti); color: #fff; text-shadow: 5px 5px 0 #1f4fe0; transform: rotate(3deg); display: inline-block; }
+.menu-tagline { text-shadow: 2px 2px 0 #000, 0 0 12px #000; }
+.menu-footer { text-shadow: 1px 1px 0 #000; }
+@media (max-height: 700px) { .menu-title .mt-1, .menu-title .mt-2 { font-size: clamp(2.4rem, 8vw, 4.4rem); } }
+
 </style>
 </head>
 <body>
@@ -2097,8 +2118,7 @@ html, body, #game-container { background-color: #000; }
       <div class="menu-backdrop"></div>
       <div class="menu-content">
         <div class="logo-wrapper">
-          <h1 class="sr-only">BEIÇO STREET — Taça das Favelas Campinas</h1>
-          <img class="menu-logo" src="logo.png" alt="Beiço Street — Taça das Favelas Campinas">
+          <h1 class="menu-title"><span class="mt-1">BEIÇO</span><span class="mt-2">STREET</span></h1>
           <p class="menu-tagline">“Favela também é <b>futebol</b>.”</p>
         </div>
 
@@ -2749,7 +2769,7 @@ const WORLD = {
   postRadius: 6,
   // Física da Bola (Mais rápida, com deslizamento fluido e quique elástico)
   ballRadius: 11,
-  friction: 0.978,
+  friction: 0.966,
   wallRestitution: 0.80
 };
 
@@ -2865,8 +2885,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round1Team.shortsColor,
         hairStyle: round1Team.hairStyle,
         hairColor: round1Team.hairColor,
-        speed: 2.55,
-        kickPowerMax: 10.5,
+        speed: 1.65,
+        kickPowerMax: 6.8,
         aiLeadFrames: 3,
         aiAttackDist: 210,
         kickPowerDefault: 0.65
@@ -2895,8 +2915,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round2Team.shortsColor,
         hairStyle: round2Team.hairStyle,
         hairColor: round2Team.hairColor,
-        speed: 2.80,
-        kickPowerMax: 12.5,
+        speed: 1.80,
+        kickPowerMax: 8.0,
         aiLeadFrames: 6,
         aiAttackDist: 275,
         kickPowerDefault: 0.80
@@ -2925,8 +2945,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round3Team.shortsColor,
         hairStyle: round3Team.hairStyle,
         hairColor: round3Team.hairColor,
-        speed: 3.00,
-        kickPowerMax: 14.0,
+        speed: 1.90,
+        kickPowerMax: 9.0,
         aiLeadFrames: 9,
         aiAttackDist: 345,
         kickPowerDefault: 0.92
@@ -2955,8 +2975,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round4Team.shortsColor,
         hairStyle: round4Team.hairStyle,
         hairColor: round4Team.hairColor,
-        speed: 3.25,
-        kickPowerMax: 14.8,
+        speed: 2.05,
+        kickPowerMax: 9.4,
         aiLeadFrames: 12,
         aiAttackDist: 430,
         kickPowerDefault: 1.0
@@ -3336,9 +3356,9 @@ class Player {
     this.vy = 0;
     this.facingAngle = config.team === 'beico' ? 0 : Math.PI;
     this.radius = 18; // Raio físico do jogador
-    this.speed = config.speed !== undefined ? config.speed : 3.0; // AUMENTADO (antes 2.04): bonecos mais rapidos
-    this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 14.5;
-    this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 5.5;
+    this.speed = config.speed !== undefined ? config.speed : 1.9; // AUMENTADO (antes 2.04): bonecos mais rapidos
+    this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 9.0;
+    this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 3.8;
 
     // Atributos de Inteligência Artificial para o Torneio
     this.aiLeadFrames = config.aiLeadFrames !== undefined ? config.aiLeadFrames : 8;
@@ -5915,9 +5935,9 @@ class GameEngine {
     p1.isControlled = true;
     p1.controlId = 1;
     this.applyPlayerTeamAppearance(p1, myTeam);
-    p1.speed = 3.0;
-    p1.kickPowerMax = 14.5;
-    p1.kickPowerMin = 5.5;
+    p1.speed = 1.9;
+    p1.kickPowerMax = 9.0;
+    p1.kickPowerMin = 3.8;
 
     // Configuração do Adversário (Time de Campinas da Fase Atual)
     const opp = roundData.opponent;
@@ -6013,14 +6033,14 @@ class GameEngine {
 
     p1.isControlled = true;
     p1.controlId = 1;
-    p1.speed = 3.0;
-    p1.kickPowerMax = 14.5;
-    p1.kickPowerMin = 5.5;
+    p1.speed = 1.9;
+    p1.kickPowerMax = 9.0;
+    p1.kickPowerMin = 3.8;
 
     this.applyPlayerTeamAppearance(p1, teams.t1);
     this.applyPlayerTeamAppearance(p2, teams.t2);
-    p2.speed = 3.0;
-    p2.kickPowerMax = 14.5;
+    p2.speed = 1.9;
+    p2.kickPowerMax = 9.0;
     p2.aiLeadFrames = 8;
     p2.aiAttackDist = 260;
     p2.kickPowerDefault = 0.85;
@@ -6548,6 +6568,63 @@ window.addEventListener('DOMContentLoaded', () => {
   window.game = game = new GameEngine();
 });
 
+</script>
+<script>
+// Favela no fundo do menu (SVG gerado, sem imagens externas)
+(function () {
+  const host = document.querySelector('#main-menu .menu-backdrop');
+  if (!host) return;
+  let seed = 20260;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const W = 1600, H = 900;
+  const cols = ['#c2410c','#ea580c','#9a3412','#b45309','#d97706','#e2e8f0','#cbd5e1','#78350f','#0e7490','#be123c','#facc15'];
+  let o = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="mbSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1b0b3a"/><stop offset=".45" stop-color="#931f3f"/><stop offset=".8" stop-color="#f59e0b"/><stop offset="1" stop-color="#fde68a"/>
+      </linearGradient>
+      <radialGradient id="mbSun"><stop offset="0" stop-color="#fff7cc"/><stop offset=".4" stop-color="#fbbf24"/><stop offset="1" stop-color="#fbbf24" stop-opacity="0"/></radialGradient>
+      <linearGradient id="mbFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".55" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity=".85"/>
+      </linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="url(#mbSky)"/>
+    <circle cx="1180" cy="330" r="190" fill="url(#mbSun)"/>
+    <path d="M0 470 Q300 330 620 420 T1250 380 T1600 430 V900 H0Z" fill="#14532d" opacity=".9"/>`;
+  const rows = 7;
+  for (let i = 0; i < rows; i++) {
+    const k = i / (rows - 1);                 // 0 = longe, 1 = perto
+    const base = 470 + i * 62;
+    const hMin = 40 + k * 55, hMax = 70 + k * 85;
+    let x = -60 - rnd() * 60;
+    while (x < W + 40) {
+      const w = 56 + k * 40 + rnd() * 46;
+      const h = hMin + rnd() * (hMax - hMin);
+      const c = cols[Math.floor(rnd() * cols.length)];
+      const y = base - h;
+      o += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${c}"/>`;
+      o += `<rect x="${(x - 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" width="${(w + 4).toFixed(1)}" height="7" fill="#57534e"/>`;
+      if (rnd() < 0.45) o += `<rect x="${(x + w * 0.3).toFixed(1)}" y="${(y - 5 - 16 - k * 8).toFixed(1)}" width="${(18 + k * 8).toFixed(1)}" height="${(16 + k * 8).toFixed(1)}" rx="3" fill="#0284c7"/>`;
+      const ww = 9 + k * 8, wh = 12 + k * 9;
+      for (let wx = x + 10; wx + ww < x + w - 6; wx += ww + 14) {
+        for (let wy = y + 12; wy + wh < y + h - 6; wy += wh + 16) {
+          const lit = rnd() < 0.35;
+          o += `<rect x="${wx.toFixed(1)}" y="${wy.toFixed(1)}" width="${ww.toFixed(1)}" height="${wh.toFixed(1)}" fill="${lit ? '#fde047' : '#1e293b'}"${lit ? ' opacity=".9"' : ''}/>`;
+        }
+      }
+      x += w + 3 + rnd() * 8;
+    }
+    if (i < rows - 1) o += `<rect width="${W}" height="${H}" fill="#f59e0b" opacity=".07"/>`;
+  }
+  // fios de poste, tênis pendurado e bandeira
+  o += `<g stroke="#0a0a0a" stroke-width="2.5" fill="none">
+      <path d="M-20 250 Q400 360 800 290 T1620 300"/><path d="M-20 300 Q420 410 820 340 T1620 350"/>
+      <path d="M260 120 V420 M1380 90 V430" stroke-width="6"/></g>
+    <g fill="#dc2626"><rect x="640" y="300" width="14" height="9" rx="2"/><rect x="658" y="306" width="14" height="9" rx="2"/></g>
+    <path d="M1380 90 h58 l-8 14 l8 14 h-58z" fill="#00a859"/><path d="M1394 104 l15-9 l15 9 l-15 9z" fill="#ffd400"/>
+    <rect width="${W}" height="${H}" fill="url(#mbFade)"/></svg>`;
+  host.innerHTML = o;
+})();
 </script>
 </body>
 </html>
