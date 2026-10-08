@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>BEIÇO STREET — Futebol de Rua</title>
-  <meta name="description" content="Jogo arcade de futebol de rua na favela brasileira estilo FIFA Street. Jogue contra a IA ou no modo 2 jogadores!">
+  <title>BEIÇO STREET — Taça das Favelas Campinas</title>
+  <meta name="description" content="Beiço Street — Taça das Favelas Campinas. Futebol de rua 1v1: escolha seu time da quebrada e jogue contra a CPU ou no modo 2 jogadores!">
   
   <!-- Fontes Arcade / Street Urbanas -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1792,6 +1792,211 @@ html, body {
   font-size: 0.5rem;
   color: var(--street-gray);
 }
+/* ==========================================================
+   TEMA "BEIÇO STREET — TAÇA DAS FAVELAS CAMPINAS"
+   Preto + verde/amarelo/azul do Brasil, grafite e tinta respingada
+   ========================================================== */
+:root {
+  --bg-dark: #000000;
+  --beico-yellow: #ffd400;
+  --beico-green: #00a859;
+  --beico-blue: #1f4fe0;
+  --beico-glow: rgba(255, 212, 0, 0.45);
+  --rivais-red: #3b82f6;
+  --rivais-glow: rgba(59, 130, 246, 0.5);
+  --sunset-gold: #ffd400;
+  --street-neon-cyan: #00a859;
+  --shadow-glow-yellow: 0 0 25px rgba(255, 212, 0, 0.6);
+}
+
+html, body, #game-container { background-color: #000; }
+
+.overlay-screen {
+  background: rgba(0, 0, 0, 0.84);
+  backdrop-filter: blur(4px);
+}
+
+/* Menu principal: fundo preto com anel de tinta verde/amarela/azul */
+#main-menu {
+  background:
+    radial-gradient(ellipse at 12% 8%, rgba(0, 168, 89, 0.38) 0%, transparent 38%),
+    radial-gradient(ellipse at 90% 14%, rgba(31, 79, 224, 0.42) 0%, transparent 40%),
+    radial-gradient(ellipse at 85% 92%, rgba(255, 212, 0, 0.32) 0%, transparent 38%),
+    radial-gradient(ellipse at 8% 90%, rgba(31, 79, 224, 0.30) 0%, transparent 36%),
+    #000;
+}
+#main-menu::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border: 5px dashed transparent;
+  border-image: repeating-linear-gradient(90deg, #00a859 0 36px, #ffd400 36px 72px, #1f4fe0 72px 108px) 5;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.menu-content { max-width: 560px; }
+.logo-wrapper { margin-bottom: 10px; }
+.menu-logo {
+  display: block;
+  margin: 0 auto;
+  width: auto;
+  height: clamp(190px, 40vh, 380px);
+  max-width: 88vw;
+  object-fit: contain;
+  filter: drop-shadow(0 0 22px rgba(255, 212, 0, 0.28));
+  animation: logoPop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes logoPop { 0% { transform: scale(0.6) rotate(-6deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+.menu-tagline {
+  font-family: var(--font-graffiti);
+  color: #fff;
+  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
+  text-shadow: 2px 2px 0 #000;
+  margin-bottom: 10px;
+}
+.menu-tagline b { color: var(--beico-yellow); }
+
+.street-tag, .spray-badge { color: var(--beico-yellow); border-color: var(--beico-yellow); }
+.title-word-1 { color: #fff; -webkit-text-stroke: 3px #00a859; }
+.title-word-2 { color: var(--beico-yellow); }
+
+/* Botões: grafite preto com borda das cores do Brasil */
+.btn-street {
+  background: #0b0b0b;
+  border: 3px solid #000;
+  outline: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #ffd400 0%, #e6b800 100%);
+  color: #000;
+  outline-color: #00a859;
+}
+.btn-primary:hover { background: linear-gradient(135deg, #ffe34d 0%, #ffd400 100%); border-color: #000; outline-color: #fff; }
+.btn-secondary {
+  background: linear-gradient(135deg, #1f4fe0 0%, #1636a8 100%);
+  outline-color: #ffd400;
+}
+.btn-secondary:hover { background: linear-gradient(135deg, #3b6bff 0%, #1f4fe0 100%); border-color: #000; outline-color: #fff; }
+.btn-tournament {
+  background: linear-gradient(135deg, #00a859 0%, #006b38 100%);
+  outline-color: #ffd400;
+  box-shadow: 0 4px 18px rgba(0, 168, 89, 0.45), var(--shadow-comic);
+}
+.btn-tournament:hover { background: linear-gradient(135deg, #14c873 0%, #00a859 100%); border-color: #000; outline-color: #fff; box-shadow: 0 6px 22px rgba(0, 168, 89, 0.7), 7px 7px 0 #000; }
+.btn-accent { background: #0b0b0b; outline-color: rgba(255, 212, 0, 0.5); }
+.btn-accent:hover { background: #1a1a1a; border-color: #000; outline-color: var(--beico-yellow); }
+
+/* Placar e HUD */
+.scoreboard-container {
+  background: rgba(0, 0, 0, 0.9);
+  border: 3px solid var(--beico-yellow);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 18px rgba(0, 168, 89, 0.35);
+}
+.team-beico .team-name { color: var(--beico-yellow); }
+.team-rivais .team-name { color: #5b8dff; text-shadow: 0 0 10px rgba(59, 130, 246, 0.6); }
+.team-score { background: #000; border-color: var(--beico-green); }
+.match-versus { color: var(--beico-green); }
+
+/* Cards e caixas dos modais */
+.modal-box, .tournament-box, .tournament-result-box, .game-over-box {
+  background: #050505 !important;
+  border: 3px solid var(--beico-yellow) !important;
+  box-shadow: 0 0 0 3px #000, 0 0 0 6px var(--beico-green), 0 0 0 9px #000, 0 0 0 12px var(--beico-blue), 0 20px 60px rgba(0, 0, 0, 0.8) !important;
+}
+.team-card-campinas { background: rgba(8, 8, 8, 0.95); border-color: rgba(255, 255, 255, 0.14); }
+.team-card-campinas:hover { border-color: var(--beico-green); box-shadow: 0 8px 20px rgba(0,0,0,0.6), 0 0 14px rgba(0, 168, 89, 0.45); }
+.team-card-campinas.selected {
+  border-color: var(--beico-yellow);
+  background: linear-gradient(180deg, #101200 0%, #000 100%);
+  box-shadow: 0 0 18px rgba(255, 212, 0, 0.55), inset 0 0 12px rgba(255, 212, 0, 0.18);
+}
+
+/* ==========================================================
+   TELA DE ESCOLHA DE TIMES (1 JOGADOR / 2 JOGADORES)
+   ========================================================== */
+.team-select-box {
+  width: min(1040px, 96vw);
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  background: #050505;
+  border: 3px solid var(--beico-yellow);
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px #000, 0 0 0 6px var(--beico-green), 0 0 0 9px #000, 0 0 0 12px var(--beico-blue), 0 20px 60px rgba(0,0,0,0.8);
+  overflow: hidden;
+}
+.ts-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ts-header .modal-title { font-size: clamp(1rem, 2.6vw, 1.6rem); }
+.ts-sub { font-size: 0.78rem; opacity: 0.75; margin-top: 2px; }
+.ts-columns { display: flex; gap: 10px; min-height: 0; flex: 1; align-items: stretch; }
+.ts-col {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px; border-radius: 8px; background: #0b0b0b; border: 2px solid #222;
+}
+.ts-col-p1 { border-color: var(--beico-yellow); }
+.ts-col-p2 { border-color: #3b6bff; }
+.ts-vs {
+  align-self: center; font-family: var(--font-graffiti); font-size: 1.8rem;
+  color: var(--beico-yellow); text-shadow: 3px 3px 0 #000, 0 0 12px rgba(0,168,89,0.7);
+}
+.ts-col-title { font-family: var(--font-arcade); letter-spacing: 1px; font-size: 0.95rem; }
+.ts-col-p1 .ts-col-title { color: var(--beico-yellow); }
+.ts-col-p2 .ts-col-title { color: #5b8dff; }
+.ts-selected {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
+  background: #000; border: 1px dashed rgba(255,255,255,0.25); min-height: 62px;
+}
+.ts-selected-avatar {
+  width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; border: 3px solid #fff; flex-shrink: 0;
+}
+.ts-selected-name { font-family: var(--font-arcade); font-size: 1.05rem; line-height: 1.1; }
+.ts-selected-meta { font-size: 0.72rem; opacity: 0.8; margin-top: 2px; }
+.ts-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px;
+  overflow-y: auto; padding: 2px 4px 4px 2px; max-height: 46vh;
+  scrollbar-width: thin; scrollbar-color: var(--beico-green) #000;
+}
+.ts-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 4px; background: #0e0e0e; border: 2px solid rgba(255,255,255,0.12); border-radius: 8px;
+  color: #fff; cursor: pointer; font-family: var(--font-sans); text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ts-card:hover { transform: translateY(-2px); border-color: var(--beico-green); }
+.ts-card.selected-p1 { border-color: var(--beico-yellow); box-shadow: 0 0 14px rgba(255, 212, 0, 0.55); background: #151300; }
+.ts-card.selected-p2 { border-color: #3b6bff; box-shadow: 0 0 14px rgba(59, 107, 255, 0.6); background: #00091f; }
+.ts-card.taken { opacity: 0.28; cursor: not-allowed; filter: grayscale(0.7); }
+.ts-card.taken:hover { transform: none; border-color: rgba(255,255,255,0.12); }
+.ts-card-avatar {
+  width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; border: 2px solid #fff;
+}
+.ts-card-name { font-family: var(--font-arcade); font-size: 0.68rem; line-height: 1.1; letter-spacing: 0.3px; text-transform: uppercase; }
+.ts-card-kit { display: flex; gap: 3px; }
+.ts-card-kit span { width: 18px; height: 8px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.6); }
+.ts-card-tag {
+  position: absolute; top: -7px; right: 4px; font-size: 0.55rem; font-weight: 900; padding: 1px 5px; border-radius: 4px; color: #000;
+}
+.ts-card.selected-p1 .ts-card-tag { background: var(--beico-yellow); }
+.ts-card.selected-p2 .ts-card-tag { background: #5b8dff; color: #fff; }
+.ts-footer { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.ts-footer .btn-street { min-width: 200px; }
+@media (max-width: 760px) {
+  .ts-columns { flex-direction: column; overflow-y: auto; }
+  .ts-vs { display: none; }
+  .ts-grid { max-height: 26vh; }
+}
+
 </style>
 </head>
 <body>
@@ -1892,25 +2097,15 @@ html, body {
       <div class="menu-backdrop"></div>
       <div class="menu-content">
         <div class="logo-wrapper">
-          <div class="street-tag">FAVELA ARCADE CUP</div>
-          <h1 class="main-title">
-            <span class="title-word-1">BEIÇO</span>
-            <span class="title-word-2">STREET</span>
-          </h1>
-          <p class="main-subtitle">“Futebol de rua, só os cria joga.”</p>
-          <div class="title-decorations">
-            <span class="spray-star">✦</span>
-            <span class="spray-line"></span>
-            <span class="spray-badge">100% BRASIL</span>
-            <span class="spray-line"></span>
-            <span class="spray-star">✦</span>
-          </div>
+          <h1 class="sr-only">BEIÇO STREET — Taça das Favelas Campinas</h1>
+          <img class="menu-logo" src="logo.png" alt="Beiço Street — Taça das Favelas Campinas">
+          <p class="menu-tagline">“Favela também é <b>futebol</b>.”</p>
         </div>
 
         <div class="menu-buttons">
           <button id="btn-1player" class="btn-street btn-primary">
             <span class="btn-icon">⚽</span>
-            <span class="btn-text">1 JOGADOR <small>(1v1 AMISTOSO)</small></span>
+            <span class="btn-text">1 JOGADOR <small>(ESCOLHA SEU TIME x CPU)</small></span>
           </button>
           
           <button id="btn-tournament" class="btn-street btn-tournament">
@@ -1920,7 +2115,7 @@ html, body {
 
           <button id="btn-2players" class="btn-street btn-secondary">
             <span class="btn-icon">👥</span>
-            <span class="btn-text">2 JOGADORES <small>(1v1 NO MESMO TECLADO)</small></span>
+            <span class="btn-text">2 JOGADORES <small>(CADA UM ESCOLHE O TIME)</small></span>
           </button>
           
           <button id="btn-how-to-play" class="btn-street btn-accent">
@@ -1931,7 +2126,7 @@ html, body {
 
         <div class="menu-footer">
           <span class="audio-tip">🔊 Clique em qualquer botão para ativar o som arcade</span>
-          <span class="credits">Quadra da Grota • 1v1 Estilo Beatball</span>
+          <span class="credits">Taça das Favelas • Campinas • 1v1</span>
         </div>
       </div>
     </div>
@@ -1948,7 +2143,7 @@ html, body {
           <div class="controls-grid">
             <!-- Jogador 1 -->
             <div class="control-card card-p1">
-              <div class="card-tag">JOGADOR 1 (BEIÇO)</div>
+              <div class="card-tag">JOGADOR 1</div>
               <div class="keys-display">
                 <div class="key-row">
                   <span class="key-cap">W</span>
@@ -1969,7 +2164,7 @@ html, body {
 
             <!-- Jogador 2 -->
             <div class="control-card card-p2">
-              <div class="card-tag">JOGADOR 2 (CAVEIRA)</div>
+              <div class="card-tag">JOGADOR 2</div>
               <div class="keys-display">
                 <div class="key-row">
                   <span class="key-cap">↑</span>
@@ -2005,6 +2200,36 @@ html, body {
       </div>
     </div>
 
+    <!-- TELA DE ESCOLHA DE TIMES (1 JOGADOR / 2 JOGADORES) -->
+    <div id="team-select-modal" class="overlay-screen hidden">
+      <div class="team-select-box">
+        <div class="ts-header">
+          <div>
+            <h2 class="modal-title">ESCOLHA OS TIMES DA TAÇA DAS FAVELAS</h2>
+            <p class="ts-sub" id="ts-subtitle">Cada jogador escolhe o time da sua quebrada.</p>
+          </div>
+          <button id="btn-close-team-select" class="btn-close" aria-label="Fechar">✕</button>
+        </div>
+        <div class="ts-columns">
+          <div class="ts-col ts-col-p1">
+            <div class="ts-col-title" id="ts-p1-title">JOGADOR 1</div>
+            <div class="ts-selected" id="ts-p1-selected"></div>
+            <div class="ts-grid" id="ts-p1-grid"></div>
+          </div>
+          <div class="ts-vs">VS</div>
+          <div class="ts-col ts-col-p2">
+            <div class="ts-col-title" id="ts-p2-title">JOGADOR 2</div>
+            <div class="ts-selected" id="ts-p2-selected"></div>
+            <div class="ts-grid" id="ts-p2-grid"></div>
+          </div>
+        </div>
+        <div class="ts-footer">
+          <button id="btn-team-select-play" class="btn-street btn-primary"><span>⚽</span> <span>BORA JOGAR!</span></button>
+          <button id="btn-team-select-back" class="btn-street btn-accent"><span>🏠</span> VOLTAR AO MENU</button>
+        </div>
+      </div>
+    </div>
+
     <!-- TELA DO MODO TORNEIO (CHAVEAMENTO E FASES) -->
     <div id="tournament-modal" class="overlay-screen hidden">
       <div class="tournament-box">
@@ -2027,7 +2252,7 @@ html, body {
                 <span class="campinas-city-badge">📍 CAMPINAS - SP</span>
                 <span class="selection-heading">ESCOLHA SEU TIME DA TAÇA DAS FAVELAS:</span>
               </div>
-              <span class="selection-counter" id="selected-team-badge">SÃO BERNARDO (SEU TIME ⭐)</span>
+              <span class="selection-counter" id="selected-team-badge">PADRE ANCHIETA (SEU TIME ⭐)</span>
             </div>
             
             <div class="campinas-teams-scroll-container">
@@ -2095,9 +2320,9 @@ html, body {
           <!-- Card de Destaque do Confronto da Fase Atual -->
           <div class="matchup-preview-card">
             <div class="matchup-side matchup-p1">
-              <div class="matchup-avatar beico-avatar" id="matchup-p1-avatar">🦅</div>
-              <div class="matchup-name" id="matchup-p1-name">S. BERNARDO</div>
-              <div class="matchup-team" id="matchup-p1-sub">DIGUINHO #10 • REGIÃO SUL</div>
+              <div class="matchup-avatar beico-avatar" id="matchup-p1-avatar">🏆</div>
+              <div class="matchup-name" id="matchup-p1-name">P. ANCHIETA</div>
+              <div class="matchup-team" id="matchup-p1-sub">TAÇA DAS FAVELAS CAMPINAS</div>
             </div>
 
             <div class="matchup-vs-badge">
@@ -2142,7 +2367,7 @@ html, body {
 
         <div class="final-score-board tourney-score-board">
           <div class="final-team">
-            <span id="tourney-score-p1-name" class="team-name">S. BERNARDO</span>
+            <span id="tourney-score-p1-name" class="team-name">P. ANCHIETA</span>
             <span id="tourney-score-beico" class="final-points">0</span>
           </div>
           <span class="final-vs">×</span>
@@ -2175,12 +2400,12 @@ html, body {
 
         <div class="final-score-board">
           <div class="final-team">
-            <span class="team-name">BEIÇO</span>
+            <span id="final-name-p1" class="team-name">BEIÇO</span>
             <span id="final-score-beico" class="final-points">3</span>
           </div>
           <span class="final-vs">×</span>
           <div class="final-team">
-            <span class="team-name">RIVAIS</span>
+            <span id="final-name-p2" class="team-name">RIVAIS</span>
             <span id="final-score-rivais" class="final-points">1</span>
           </div>
         </div>
@@ -2532,246 +2757,89 @@ const WORLD = {
 // 2.1 TIMES E ESTRUTURA DA TAÇA DAS FAVELAS DE CAMPINAS
 // Catálogo oficial das comunidades e gerador de chaveamento progressivo
 // ====================================================================
-const CAMPINAS_FAVELA_TEAMS = [
-  {
-    id: 'sao-bernardo',
-    name: 'São Bernardo',
-    shortName: 'S. BERNARDO',
-    region: 'Região Sul',
-    starPlayer: 'Diguinho #10',
-    number: '10',
-    avatar: '🦅',
-    shirtColor: '#1d4ed8', // Azul Real
-    shortsColor: '#facc15', // Amarelo Dourado
-    skinTone: '#8d5524',
-    hairStyle: 'afro',
-    hairColor: '#171717',
-    tagline: 'O Gigante da Região Sul • Campeão da Taça',
-    stats: { vel: 92, chute: 90, raca: 95 },
-    description: 'Comunidade tradicionalíssima da Região Sul de Campinas, berço de campeões com toque refinado e torcida apaixonada.',
-    tier: 1
-  },
-  {
-    id: 'paranapanema',
-    name: 'Paranapanema',
-    shortName: 'PANEMA',
-    region: 'Região Sul (Colina)',
-    starPlayer: 'Vitinho #11',
-    number: '11',
-    avatar: '⚡',
-    shirtColor: '#dc2626', // Vermelho Rubi
-    shortsColor: '#18181b', // Preto
-    skinTone: '#5c3826',
-    hairStyle: 'dreads',
-    hairColor: '#171717',
-    tagline: 'O Terror da Colina • Garra e Coração',
-    stats: { vel: 95, chute: 92, raca: 98 },
-    description: 'A histórica comunidade do Panema. Time com intensidade feroz, dribles desconcertantes e uma das maiores potências de Campinas.',
-    tier: 1
-  },
-  {
-    id: 'padre-anchieta',
-    name: 'Padre Anchieta',
-    shortName: 'P. ANCHIETA',
-    region: 'Região Norte',
-    starPlayer: 'Kauã #7',
-    number: '7',
-    avatar: '🛡️',
-    shirtColor: '#0284c7', // Azul Celeste
-    shortsColor: '#ffffff', // Branco
-    skinTone: '#b5784a',
-    hairStyle: 'blonde',
-    hairColor: '#fef08a',
-    tagline: 'Gigante da Zona Norte • Atual Campeão',
-    stats: { vel: 90, chute: 94, raca: 92 },
-    description: 'Campeão da Taça das Favelas de Campinas! Time tático, com bomba de fora da área e futebol agressivo e veloz.',
-    tier: 1
-  },
-  {
-    id: 'sao-marcos',
-    name: 'São Marcos',
-    shortName: 'SÃO MARCOS',
-    region: 'Região Leste',
-    starPlayer: 'Biel #9',
-    number: '9',
-    avatar: '🦁',
-    shirtColor: '#15803d', // Verde Esmeralda
-    shortsColor: '#ffffff', // Branco
-    skinTone: '#78350f',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'A Força do São Marcos • Tradição da Quebrada',
-    stats: { vel: 89, chute: 91, raca: 94 },
-    description: 'Multicampeão com história pesada nos gramados e quadras de Campinas. Presença de área fulminante e raça pura.',
-    tier: 1
-  },
-  {
-    id: 'satelite-iris',
-    name: 'Satélite Íris',
-    shortName: 'SATÉLITE',
-    region: 'Região Noroeste',
-    starPlayer: 'Renan #8',
-    number: '8',
-    avatar: '🪐',
-    shirtColor: '#881337', // Vinho / Bordô
-    shortsColor: '#f8fafc', // Branco gelo
-    skinTone: '#a16207',
-    hairStyle: 'afro',
-    hairColor: '#1c1917',
-    tagline: 'Raça do Satélite • Orgulho do Noroeste',
-    stats: { vel: 88, chute: 88, raca: 93 },
-    description: 'Finalista emblemático de Campinas. Equipe que nunca desiste de nenhuma bola, brigando até o último apito do juiz.',
-    tier: 2
-  },
-  {
-    id: 'campo-belo',
-    name: 'Campo Belo',
-    shortName: 'CAMPO BELO',
-    region: 'Região Viracopos',
-    starPlayer: 'Bruninho #10',
-    number: '10',
-    avatar: '✈️',
-    shirtColor: '#ea580c', // Laranja Fogo
-    shortsColor: '#1e3a8a', // Azul Marinho
-    skinTone: '#6b3e26',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'Voando Alto • Força de Viracopos',
-    stats: { vel: 93, chute: 87, raca: 90 },
-    description: 'Time de velocidade relâmpago vindo da grande comunidade do Campo Belo. Contra-ataques mortais no asfalto.',
-    tier: 2
-  },
-  {
-    id: 'florence-ii',
-    name: 'Florence II',
-    shortName: 'FLORENCE',
-    region: 'Campo Grande',
-    starPlayer: 'Juninho #11',
-    number: '11',
-    avatar: '💎',
-    shirtColor: '#7c3aed', // Roxo Neon
-    shortsColor: '#ffffff', // Branco
-    skinTone: '#5c3826',
-    hairStyle: 'blonde',
-    hairColor: '#fde047',
-    tagline: 'Brilho do Campo Grande • Futebol Arte',
-    stats: { vel: 91, chute: 90, raca: 88 },
-    description: 'Dribles plásticos e magia na ponta dos pés. A comunidade do Florence traz talento puro e ousadia nas tabelas.',
-    tier: 2
-  },
-  {
-    id: 'parque-brasilia',
-    name: 'Parque Brasília',
-    shortName: 'PQ. BRASÍLIA',
-    region: 'Região Leste',
-    starPlayer: 'Pedrinho #10',
-    number: '10',
-    avatar: '🌟',
-    shirtColor: '#06b6d4', // Ciano / Azul Turquesa
-    shortsColor: '#0f172a', // Azul Noite
-    skinTone: '#b5784a',
-    hairStyle: 'afro',
-    hairColor: '#171717',
-    tagline: 'Estrela da Quebrada • Campeão da Raça',
-    stats: { vel: 90, chute: 91, raca: 91 },
-    description: 'Comunidade vibrante e unida, campeã na categoria feminina e grande potência das quadras da Zona Leste.',
-    tier: 2
-  },
-  {
-    id: 'costa-e-silva',
-    name: 'Costa e Silva',
-    shortName: 'COSTA & SILVA',
-    region: 'Região Norte',
-    starPlayer: 'Marcelinho #5',
-    number: '5',
-    avatar: '🐅',
-    shirtColor: '#eab308', // Amarelo Canário
-    shortsColor: '#18181b', // Preto
-    skinTone: '#8d5524',
-    hairStyle: 'afro',
-    hairColor: '#000000',
-    tagline: 'Guerreiros Amarelos • Marcação Pesada',
-    stats: { vel: 87, chute: 89, raca: 92 },
-    description: 'Tradição do futebol de várzea campineiro. Marcação implacável colada na quadra e chutes venenosos de média distância.',
-    tier: 3
-  },
-  {
-    id: 'dic-vi',
-    name: 'DIC VI',
-    shortName: 'DIC VI',
-    region: 'Distrito Industrial',
-    starPlayer: 'Thiaguinho #6',
-    number: '6',
-    avatar: '⚙️',
-    shirtColor: '#334155', // Cinza Chumbo
-    shortsColor: '#dc2626', // Vermelho
-    skinTone: '#a16207',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'Paredão do DIC • Força Indestrutível',
-    stats: { vel: 86, chute: 92, raca: 96 },
-    description: 'O famoso Paredão do DIC. Futebol de força física, divididas firmes e pancada na gaveta.',
-    tier: 3
-  },
-  {
-    id: 'cafezinho',
-    name: 'Cafezinho',
-    shortName: 'CAFEZINHO',
-    region: 'Região Sul',
-    starPlayer: 'Nenê #9',
-    number: '9',
-    avatar: '☕',
-    shirtColor: '#78350f', // Marrom Café
-    shortsColor: '#facc15', // Amarelo
-    skinTone: '#78350f',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'Ginga Pura • Respeita a Tradição',
-    stats: { vel: 89, chute: 87, raca: 89 },
-    description: 'Time irreverente da Região Sul de Campinas, rápido nas roubadas de bola e no contragolpe.',
-    tier: 3
-  },
-  {
-    id: 'vida-nova',
-    name: 'Vida Nova',
-    shortName: 'VIDA NOVA',
-    region: 'Região Sudoeste',
-    starPlayer: 'Danilinho #7',
-    number: '7',
-    avatar: '🌱',
-    shirtColor: '#16a34a', // Verde Vivo
-    shortsColor: '#1e293b', // Grafite
-    skinTone: '#8d5524',
-    hairStyle: 'blonde',
-    hairColor: '#fef08a',
-    tagline: 'Esperança e Futuro • Muita Bola no Pé',
-    stats: { vel: 91, chute: 88, raca: 90 },
-    description: 'A energia da juventude do Sudoeste campineiro, com transições velozes e muita sede de vitória.',
-    tier: 3
-  }
+// ====================================================================
+// TIMES DA TAÇA DAS FAVELAS CAMPINAS (masculino, edição 2026)
+// Nomes das comunidades conforme divulgado na imprensa local.
+// Cores dos mantos, jogadores e atributos são fictícios (do jogo).
+// tier 1 = semifinalistas / campeão, 2 = quartas, 3 = demais times
+// ====================================================================
+const _TEAM_DATA = [
+  // id, nome, nome curto, camisa, calção, tier, avatar, tagline especial
+  ['padre-anchieta',  'Padre Anchieta',  'P. ANCHIETA',  '#16a34a', '#ffffff', 1, '🏆', 'Campeão da Taça 2026 👑'],
+  ['costa-e-silva',   'Costa e Silva',   'COSTA E SILVA','#1d4ed8', '#facc15', 1, '🦅', 'Vice-campeão da Taça 2026'],
+  ['dic-vi',          'DIC VI',          'DIC VI',       '#dc2626', '#111827', 1, '🔥', 'Semifinalista da Taça 2026'],
+  ['santa-lucia',     'Santa Lúcia',     'SANTA LÚCIA',  '#7c3aed', '#ffffff', 1, '⭐', 'Semifinalista da Taça 2026'],
+  ['santa-terezinha', 'Santa Terezinha', 'S. TEREZINHA', '#f97316', '#1e293b', 2, '🌟', 'Quartas de final • Taça 2026'],
+  ['nilopolis',       'Nilópolis',       'NILÓPOLIS',    '#0891b2', '#ffffff', 2, '🌊', 'Quartas de final • Taça 2026'],
+  ['cafezinho',       'Cafezinho',       'CAFEZINHO',    '#78350f', '#fde68a', 2, '☕', 'Quartas de final • Taça 2026'],
+  ['vila-rica',       'Vila Rica',       'VILA RICA',    '#eab308', '#166534', 2, '💎', 'Quartas de final • Taça 2026'],
+  ['carlos-lourenco', 'Carlos Lourenço', 'C. LOURENÇO',  '#be123c', '#ffffff', 2, '⚔️', 'Quartas de final • Taça 2026'],
+  ['sao-jose',        'São José',        'SÃO JOSÉ',     '#2563eb', '#ffffff', 3, '🛡️', ''],
+  ['paranapanema',    'Paranapanema',    'PANEMA',       '#059669', '#facc15', 3, '⚡', ''],
+  ['jardim-rosalia',  'Jardim Rosália',  'J. ROSÁLIA',   '#db2777', '#1e293b', 3, '🌹', ''],
+  ['san-martins',     'San Martins',     'SAN MARTINS',  '#475569', '#f97316', 3, '🐺', ''],
+  ['florence-ii',     'Florence II',     'FLORENCE II',  '#0ea5e9', '#111827', 3, '🌸', ''],
+  ['parque-oziel',    'Parque Oziel',    'PQ. OZIEL',    '#84cc16', '#1e3a8a', 3, '🌳', ''],
+  ['vista-alegre',    'Vista Alegre',    'VISTA ALEGRE', '#facc15', '#1d4ed8', 3, '☀️', ''],
+  ['vila-vitoria',    'Vila Vitória',    'VILA VITÓRIA', '#e11d48', '#facc15', 3, '🥇', ''],
+  ['jardim-shangai',  'Jardim Shangai',  'J. SHANGAI',   '#9333ea', '#facc15', 3, '🐉', ''],
+  ['vila-31-marco',   'Vila 31 de Março','31 DE MARÇO',  '#0f766e', '#ffffff', 3, '📅', ''],
+  ['jardim-capivari', 'Jardim Capivari', 'J. CAPIVARI',  '#15803d', '#1e293b', 3, '🐾', ''],
+  ['campo-belo',      'Campo Belo',      'CAMPO BELO',   '#ea580c', '#ffffff', 3, '🏟️', '']
 ];
+
+const _STAR_NAMES = ['Diguinho','Vitinho','Kauã','Pedrinho','Juninho','Lucão','Nickão','Guto','Rafinha','Tiaguinho','Biel','Dudu','Cauê','Léo','Matheuzinho','Caio','Davi','Ryan','Bruninho','Théo','Enzo'];
+const _SKINS = ['#8d5524', '#c68642', '#a16207', '#5c3a1e', '#e0ac69', '#7b4a2b'];
+const _HAIRS = ['afro', 'buzz', 'dreads', 'blonde', 'buzz', 'afro'];
+const _HAIR_COLORS = { afro: '#171717', buzz: '#1c1917', dreads: '#292524', blonde: '#fef08a' };
+const _NUMBERS = ['10', '7', '9', '11', '8', '5', '6'];
+
+const CAMPINAS_FAVELA_TEAMS = _TEAM_DATA.map((d, i) => {
+  const [id, name, shortName, shirt, shorts, tier, avatar, special] = d;
+  const hair = _HAIRS[i % _HAIRS.length];
+  const base = tier === 1 ? 91 : (tier === 2 ? 87 : 83);
+  const wob = (k) => base + ((i * 7 + k * 5) % 7);
+  const star = _STAR_NAMES[i % _STAR_NAMES.length];
+  const number = _NUMBERS[i % _NUMBERS.length];
+  return {
+    id, name, shortName,
+    region: 'Campinas • SP',
+    starPlayer: `${star} #${number}`,
+    number,
+    avatar,
+    shirtColor: shirt,
+    shortsColor: shorts,
+    skinTone: _SKINS[i % _SKINS.length],
+    hairStyle: hair,
+    hairColor: _HAIR_COLORS[hair],
+    tagline: special || 'Taça das Favelas Campinas 2026',
+    stats: { vel: wob(1), chute: wob(2), raca: wob(3) },
+    description: `${name} representa a quebrada na Taça das Favelas de Campinas. ${special || 'Time de garra, bola no chão e muita vontade de levantar o troféu.'}`,
+    tier
+  };
+});
+
+function _pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function generateCampinasTournamentRounds(userTeamId) {
   const userTeam = CAMPINAS_FAVELA_TEAMS.find(t => t.id === userTeamId) || CAMPINAS_FAVELA_TEAMS[0];
   const availableTeams = CAMPINAS_FAVELA_TEAMS.filter(t => t.id !== userTeam.id);
 
-  // Pool Tier 3 (Oitavas)
-  const tier3 = availableTeams.filter(t => t.tier === 3);
-  const round1Team = tier3[Math.floor(Math.random() * tier3.length)] || availableTeams[0];
-
-  // Pool Tier 2 (Quartas)
-  const tier2 = availableTeams.filter(t => t.tier === 2 && t.id !== round1Team.id);
-  const round2Team = (tier2.length > 0 ? tier2 : availableTeams.filter(t => t.id !== round1Team.id))[0];
-
-  // Pool Semifinal (Times fortes diferentes dos anteriores)
-  const semiPool = availableTeams.filter(t => t.id !== round1Team.id && t.id !== round2Team.id);
-  const semiCandidates = semiPool.filter(t => t.tier <= 2);
-  const round3Team = (semiCandidates.length > 0 ? semiCandidates : semiPool)[0];
-
-  // Pool Final (Gigantes da Quebrada: Paranapanema, São Bernardo, Padre Anchieta, São Marcos)
-  const finalPool = availableTeams.filter(t => t.id !== round1Team.id && t.id !== round2Team.id && t.id !== round3Team.id);
-  const finalGiants = finalPool.filter(t => t.tier === 1);
-  const round4Team = (finalGiants.length > 0 ? finalGiants : finalPool)[0] || finalPool[0];
+  // Oitavas: times de nível 3
+  const used = new Set();
+  const take = (pool) => {
+    const free = pool.filter(t => !used.has(t.id));
+    const t = _pickRandom(free.length ? free : availableTeams.filter(x => !used.has(x.id)));
+    used.add(t.id);
+    return t;
+  };
+  const round1Team = take(availableTeams.filter(t => t.tier === 3));
+  // Quartas: times de nível 2
+  const round2Team = take(availableTeams.filter(t => t.tier === 2));
+  // Semifinal: nível 2 ou 1
+  const round3Team = take(availableTeams.filter(t => t.tier <= 2));
+  // Final: os gigantes (nível 1)
+  const round4Team = take(availableTeams.filter(t => t.tier === 1));
 
   return [
     {
@@ -2897,7 +2965,7 @@ function generateCampinasTournamentRounds(userTeamId) {
   ];
 }
 
-let TOURNAMENT_ROUNDS = generateCampinasTournamentRounds('sao-bernardo');
+let TOURNAMENT_ROUNDS = generateCampinasTournamentRounds('padre-anchieta');
 
 // ====================================================================
 // 3. SISTEMA DE PARTÍCULAS E EFEITOS VISUAIS
@@ -5463,18 +5531,19 @@ class GameEngine {
   }
 
   bindUIButtons() {
+    this.bindTeamSelectUI();
     // 1 Jogador (Amistoso 1v1)
     document.getElementById('btn-1player').addEventListener('click', () => {
       audio.init();
       audio.playClick();
-      this.startMatch('1P');
+      this.openTeamSelect('1P');
     });
 
     // 2 Jogadores (1v1 no mesmo teclado)
     document.getElementById('btn-2players').addEventListener('click', () => {
       audio.init();
       audio.playClick();
-      this.startMatch('2P');
+      this.openTeamSelect('2P');
     });
 
     // Modo Torneio (Copa da Quebrada - 4 Fases Progressivas)
@@ -5617,6 +5686,122 @@ class GameEngine {
       audio.playClick();
       this.returnToMenu();
     });
+  }
+
+  // ====================================================================
+  // ESCOLHA DE TIMES (1 JOGADOR x CPU e 2 JOGADORES)
+  // ====================================================================
+  getFriendlyTeams() {
+    const T = CAMPINAS_FAVELA_TEAMS;
+    let t1 = T.find(t => t.id === this.friendlyP1Id) || this.selectedCampinasTeam || T[0];
+    let t2 = T.find(t => t.id === this.friendlyP2Id);
+    if (!t2 || t2.id === t1.id) t2 = T.find(t => t.id !== t1.id);
+    return { t1, t2 };
+  }
+
+  bindTeamSelectUI() {
+    const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    on('btn-team-select-play', () => {
+      audio.init();
+      audio.playClick();
+      this.confirmTeamSelect();
+    });
+    const back = () => { audio.playClick(); this.closeTeamSelect(true); };
+    on('btn-team-select-back', back);
+    on('btn-close-team-select', back);
+  }
+
+  openTeamSelect(mode) {
+    const T = CAMPINAS_FAVELA_TEAMS;
+    this.pickMode = mode;
+
+    // Recupera as últimas escolhas salvas
+    try {
+      if (!this.friendlyP1Id) this.friendlyP1Id = localStorage.getItem('beico_friendly_p1') || '';
+      if (!this.friendlyP2Id) this.friendlyP2Id = localStorage.getItem('beico_friendly_p2') || '';
+    } catch (e) {}
+    if (!T.find(t => t.id === this.friendlyP1Id)) this.friendlyP1Id = (this.selectedCampinasTeam || T[0]).id;
+    if (!T.find(t => t.id === this.friendlyP2Id) || this.friendlyP2Id === this.friendlyP1Id) {
+      this.friendlyP2Id = T.find(t => t.id !== this.friendlyP1Id).id;
+    }
+
+    document.getElementById('ts-p1-title').textContent = mode === '2P' ? 'JOGADOR 1 • WASD + ESPAÇO' : 'VOCÊ • WASD/SETAS + ESPAÇO';
+    document.getElementById('ts-p2-title').textContent = mode === '2P' ? 'JOGADOR 2 • SETAS + ENTER' : 'ADVERSÁRIO • CPU';
+    document.getElementById('ts-subtitle').textContent = mode === '2P'
+      ? 'Cada jogador escolhe o time da sua quebrada. Não pode repetir o time!'
+      : 'Escolha o seu time e quem você quer enfrentar na quadra.';
+
+    this.mainMenu.classList.remove('active');
+    this.mainMenu.classList.add('hidden');
+    const modal = document.getElementById('team-select-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    this.renderTeamSelect();
+  }
+
+  renderTeamSelect() {
+    const T = CAMPINAS_FAVELA_TEAMS;
+    ['p1', 'p2'].forEach(side => {
+      const grid = document.getElementById(`ts-${side}-grid`);
+      const box = document.getElementById(`ts-${side}-selected`);
+      if (!grid || !box) return;
+      const keepScroll = grid.scrollTop;
+      const ownId = side === 'p1' ? this.friendlyP1Id : this.friendlyP2Id;
+      const otherId = side === 'p1' ? this.friendlyP2Id : this.friendlyP1Id;
+
+      grid.innerHTML = '';
+      T.forEach(team => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        const isOwn = team.id === ownId;
+        const isTaken = team.id === otherId;
+        card.className = `ts-card ${isOwn ? 'selected-' + side : ''} ${isTaken ? 'taken' : ''}`;
+        card.title = isTaken ? 'Já escolhido pelo outro lado' : team.name;
+        card.innerHTML = `
+          ${isOwn ? `<div class="ts-card-tag">${side === 'p1' ? 'P1' : (this.pickMode === '2P' ? 'P2' : 'CPU')}</div>` : ''}
+          <div class="ts-card-avatar" style="background:${team.shirtColor}; border-color:${team.shortsColor};">${team.avatar}</div>
+          <div class="ts-card-name">${team.name}</div>
+          <div class="ts-card-kit"><span style="background:${team.shirtColor}"></span><span style="background:${team.shortsColor}"></span></div>
+        `;
+        card.addEventListener('click', () => {
+          if (isTaken) return;
+          if (side === 'p1') this.friendlyP1Id = team.id; else this.friendlyP2Id = team.id;
+          audio.playClick();
+          this.renderTeamSelect();
+        });
+        grid.appendChild(card);
+      });
+      grid.scrollTop = keepScroll;
+
+      const sel = T.find(t => t.id === ownId);
+      box.innerHTML = `
+        <div class="ts-selected-avatar" style="background:${sel.shirtColor}; border-color:${sel.shortsColor};">${sel.avatar}</div>
+        <div>
+          <div class="ts-selected-name">${sel.name.toUpperCase()}</div>
+          <div class="ts-selected-meta">${sel.starPlayer} • VEL ${sel.stats.vel} • CHU ${sel.stats.chute} • RAÇA ${sel.stats.raca}</div>
+        </div>`;
+    });
+  }
+
+  confirmTeamSelect() {
+    try {
+      localStorage.setItem('beico_friendly_p1', this.friendlyP1Id);
+      localStorage.setItem('beico_friendly_p2', this.friendlyP2Id);
+    } catch (e) {}
+    this.closeTeamSelect(false);
+    this.startMatch(this.pickMode || '1P');
+  }
+
+  closeTeamSelect(showMenu) {
+    const modal = document.getElementById('team-select-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.classList.add('hidden');
+    }
+    if (showMenu) {
+      this.mainMenu.classList.remove('hidden');
+      this.mainMenu.classList.add('active');
+    }
   }
 
   // ====================================================================
@@ -5813,10 +5998,14 @@ class GameEngine {
       this.tournamentStageBadge.classList.add('hidden');
     }
 
-    // Resetar HUD do adversário para o padrão
-    if (this.rivalScoreName) this.rivalScoreName.textContent = 'RIVAIS';
-    if (this.rivalScoreSub) this.rivalScoreSub.textContent = 'DO OUTRO LADO';
-    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = '🔥';
+    // Times escolhidos na tela de seleção
+    const teams = this.getFriendlyTeams();
+    if (this.p1ScoreName) this.p1ScoreName.textContent = teams.t1.shortName;
+    if (this.p1ScoreSub) this.p1ScoreSub.textContent = mode === '2P' ? 'JOGADOR 1' : 'VOCÊ';
+    if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = teams.t1.avatar;
+    if (this.rivalScoreName) this.rivalScoreName.textContent = teams.t2.shortName;
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = mode === '2P' ? 'JOGADOR 2' : 'CPU';
+    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = teams.t2.avatar;
 
     // Atualizar jogadores
     const p1 = this.players[0]; // Beiço
@@ -5828,13 +6017,8 @@ class GameEngine {
     p1.kickPowerMax = 14.5;
     p1.kickPowerMin = 5.5;
 
-    p2.name = 'Caveira #9';
-    p2.skinTone = '#a16207';
-    p2.shirtColor = '#ef4444';
-    p2.shortsColor = '#4338ca';
-    p2.hairStyle = 'buzz';
-    p2.hairColor = '#1c1917';
-    p2.number = '9';
+    this.applyPlayerTeamAppearance(p1, teams.t1);
+    this.applyPlayerTeamAppearance(p2, teams.t2);
     p2.speed = 3.0;
     p2.kickPowerMax = 14.5;
     p2.aiLeadFrames = 8;
@@ -6047,23 +6231,38 @@ class GameEngine {
     const titleEl = document.getElementById('game-over-title');
     const subEl = document.getElementById('game-over-subtitle');
 
+    const ft = this.getFriendlyTeams();
     document.getElementById('final-score-beico').textContent = this.scoreBeico;
     document.getElementById('final-score-rivais').textContent = this.scoreRivais;
+    const fn1 = document.getElementById('final-name-p1');
+    const fn2 = document.getElementById('final-name-p2');
+    if (fn1) fn1.textContent = ft.t1.shortName;
+    if (fn2) fn2.textContent = ft.t2.shortName;
 
     if (this.scoreBeico > this.scoreRivais) {
-      titleEl.textContent = 'É O BEIÇO!';
-      titleEl.style.color = '#facc15';
+      titleEl.textContent = `É O ${ft.t1.shortName}!`;
+      titleEl.style.color = '#ffd400';
       subEl.textContent = this.isGoldenGoal 
         ? 'Vitória heroica no Gol de Ouro com tempo infinito! Respeita!' 
-        : 'A Taça das Favela fica em casa! Respeita os cria!';
+        : 'A Taça das Favelas fica na quebrada! Respeita os cria!';
       this.particles.triggerGoalConfetti();
       audio.playCheer();
     } else if (this.scoreRivais > this.scoreBeico) {
-      titleEl.textContent = 'HOJE NÃO DEU...';
-      titleEl.style.color = '#ef4444';
-      subEl.textContent = this.isGoldenGoal 
-        ? 'Derrota dolorida na morte súbita do Gol de Ouro! Amanhã tem revanche!' 
-        : 'Os rivais levaram essa. Mas amanhã tem revanche na quadra!';
+      if (this.gameMode === '2P') {
+        titleEl.textContent = `É O ${ft.t2.shortName}!`;
+        titleEl.style.color = '#5b8dff';
+        subEl.textContent = this.isGoldenGoal
+          ? 'Gol de Ouro no tempo infinito! Respeita o Jogador 2!'
+          : 'O Jogador 2 levou a melhor na quadra!';
+        this.particles.triggerGoalConfetti();
+        audio.playCheer();
+      } else {
+        titleEl.textContent = 'HOJE NÃO DEU...';
+        titleEl.style.color = '#5b8dff';
+        subEl.textContent = this.isGoldenGoal 
+          ? 'Derrota dolorida na morte súbita do Gol de Ouro! Amanhã tem revanche!' 
+          : `${ft.t2.name} levou essa. Mas amanhã tem revanche na quadra!`;
+      }
     } else {
       titleEl.textContent = 'GOL DE OURO!';
       titleEl.style.color = '#38bdf8';
