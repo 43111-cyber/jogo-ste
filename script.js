@@ -4248,6 +4248,8 @@ class GameEngine {
     const btnNext = document.getElementById('btn-tourney-next');
     const btnNextText = document.getElementById('btn-tourney-next-text');
     const btnRetry = document.getElementById('btn-tourney-retry');
+    const btnMenu = document.getElementById('btn-tourney-menu');
+    if (btnMenu) btnMenu.classList.remove('hidden');
 
     if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreText('beico');
     if (scoreRivalEl) scoreRivalEl.textContent = this.scoreText('rivais');
@@ -4309,6 +4311,7 @@ class GameEngine {
 
       btnNext.classList.add('hidden');
       btnRetry.classList.remove('hidden');
+      if (btnMenu) btnMenu.classList.add('hidden');
       btnRetry.innerHTML = '<span>🔄</span> RECOMEÇAR DO INÍCIO';
 
       // Volta para a fase 1 com um novo chaveamento
