@@ -3095,8 +3095,9 @@ class Player {
   }
 
   // Inteligência Artificial pura para 1v1 estilo Beatball
-  // Corrigida: nunca mais "fica parado". A IA persegue a bola morta, tem histerese
-  // para não oscilar na fronteira, watchdog anti-travamento e limpa bola na parede.
+  // Versao final: SEM tremedeira. O alvo tem zona morta MAIOR que a derrapagem dos
+  // personagens rapidos, entao o bot chega, para e chuta em vez de oscilar no lugar.
+  // O anti-travamento virou um desvio lateral suave (nao um solavanco aleatorio).
   computeAI(ball, players) {
     const input = { x: 0, y: 0, wantKick: false, kickPower: 0.85, aim: null };
 
@@ -3108,68 +3109,59 @@ class Player {
     const dyToBall = ball.y - this.y;
     const distToBall = Math.hypot(dxToBall, dyToBall);
 
-    // --- MEMÓRIA DA IA (ANTI-TRAVAMENTO) ---
+    // --- MEMORIA DA IA ---
     if (this.aiState === undefined) this.aiState = 'CHASE';
     if (this.aiStuckTimer === undefined) this.aiStuckTimer = 0;
     if (this.aiJitterX === undefined) this.aiJitterX = 0;
     if (this.aiJitterY === undefined) this.aiJitterY = 0;
+    if (this.aiJitterSide === undefined) this.aiJitterSide = 1;
     if (this.aiPrevX === undefined) { this.aiPrevX = this.x; this.aiPrevY = this.y; }
 
-    // Watchdog: se a IA mandou andar mas quase não saiu do lugar, destrava
+    // Watchdog: so acumula travamento se a IA QUIS andar e nao saiu do lugar
     const movedSinceLast = Math.hypot(this.x - this.aiPrevX, this.y - this.aiPrevY);
-    const wantedToMove = (this.aiLastLen !== undefined && this.aiLastLen > 0);
-    if (wantedToMove && movedSinceLast < 0.25) {
-      this.aiStuckTimer++;
-    } else {
-      this.aiStuckTimer = Math.max(0, this.aiStuckTimer - 2);
-    }
+    if (this.aiLastLen > 0.1 && movedSinceLast < 0.35) this.aiStuckTimer++;
+    else this.aiStuckTimer = Math.max(0, this.aiStuckTimer - 2);
     this.aiPrevX = this.x;
     this.aiPrevY = this.y;
 
-    if (this.aiStuckTimer > 30) {
-      // Sorteia um desvio lateral por alguns frames e volta a perseguir a bola
-      this.aiJitterX = (Math.random() - 0.5) * 1.8;
-      this.aiJitterY = (Math.random() < 0.5 ? -1 : 1) * 1.8;
+    // Desvio anti-travamento suave e persistente (perpendicular a direcao da bola)
+    if (this.aiStuckTimer > 45) {
+      const pl = distToBall || 1;
+      this.aiJitterX = (-dyToBall / pl) * 26 * this.aiJitterSide;
+      this.aiJitterY = (dxToBall / pl) * 26 * this.aiJitterSide;
       this.aiStuckTimer = 0;
+      this.aiJitterSide = -this.aiJitterSide;
     }
-    if (Math.abs(this.aiJitterX) > 0.02 || Math.abs(this.aiJitterY) > 0.02) {
-      this.aiJitterX *= 0.90;
-      this.aiJitterY *= 0.90;
+    if (Math.abs(this.aiJitterX) > 0.3 || Math.abs(this.aiJitterY) > 0.3) {
+      this.aiJitterX *= 0.94;
+      this.aiJitterY *= 0.94;
     } else {
       this.aiJitterX = 0;
       this.aiJitterY = 0;
     }
 
-    // Antecipação da trajetória da bola calibrada pelos atributos de inteligência da fase
+    // Antecipacao da trajetoria da bola calibrada pelos atributos de inteligencia da fase
     const lead = this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8;
     const futureBallX = ball.x + ball.vx * lead;
     const futureBallY = ball.y + ball.vy * lead;
 
-    // Checa se o adversário acabou de chutar a bola para não anular o chute no mesmo frame
     const opponentJustKicked = ball.lastTouchPlayer && ball.lastTouchPlayer !== this && ball.lastTouchPlayer.kickAnimTimer > 8;
 
     const ballSpeed = Math.hypot(ball.vx, ball.vy);
-    const ballAtRest = ballSpeed < 0.35; // Bola praticamente parada no chão
+    const ballAtRest = ballSpeed < 0.35;
     const ballInOurHalf = ball.x > (WORLD.courtLeft + WORLD.courtRight) / 2;
     const ballDangerous = ball.vx > 1.2 && ball.x > 800;
-
-    // Bola encurralada na parede direita: a IA não tem como se colocar "atrás" dela,
-    // então se posiciona à esquerda e limpa a bola com um chute mirado no gol adversário.
     const ballPinnedRightWall = ball.x > WORLD.courtRight - (this.radius + ball.radius + 34);
 
     const attackDist = this.aiAttackDist !== undefined ? this.aiAttackDist : 260;
 
-    // HISTERESE: entra em ataque com um raio e só sai com um raio bem menor.
-    // Sem isso, a IA oscilava na fronteira e ficava tremendo no lugar (parecia parada).
-    const enterDist = attackDist;
-    const leaveDist = attackDist * 0.65;
+    // HISTERESE: nao oscila entre atacar e defender na fronteira do raio
     if (this.aiState === 'CHASE') {
-      if (!ballAtRest && !ballDangerous && distToBall > leaveDist) this.aiState = 'DEFEND';
-    } else if (ballAtRest || ballDangerous || distToBall < enterDist) {
+      if (!ballAtRest && !ballDangerous && distToBall > attackDist * 0.65) this.aiState = 'DEFEND';
+    } else if (ballAtRest || ballDangerous || distToBall < attackDist) {
       this.aiState = 'CHASE';
     }
-    // Bola morta no chão = a IA SEMPRE vai buscar (não fica plantada olhando)
-    if (ballAtRest) this.aiState = 'CHASE';
+    if (ballAtRest) this.aiState = 'CHASE'; // bola morta no chao: sempre vai buscar
 
     const shouldAttackBall = (this.aiState === 'CHASE')
       || ballDangerous
@@ -3177,59 +3169,58 @@ class Player {
 
     let moveTargetX;
     let moveTargetY;
-    let dribbleBehindBall = true;
+    let cleanupKick = false;
 
     if (shouldAttackBall) {
-      // Bola já passou pela IA rumo ao próprio gol: entra pelo lado do gol para limpar
-      const ballPastBot = ball.x > this.x + 6;
       if (ballPinnedRightWall) {
-        moveTargetX = ball.x - (this.radius + ball.radius + 8);
-        dribbleBehindBall = false;
-      } else if (ballPastBot) {
-        moveTargetX = ball.x + 34;
-        moveTargetY = ball.y + (ball.y < midGoalY ? -34 : 34); // desvia por fora da bola
-        dribbleBehindBall = false;
+        // Bola presa na parede: posiciona a esquerda e limpa mirando o gol adversario
+        moveTargetX = ball.x - 20;
+        moveTargetY = ball.y + (ball.y < midGoalY ? -10 : 10);
+        cleanupKick = true;
+      } else if (ball.x > this.x + 6) {
+        // Bola ja passou pela IA: contorna para nao empurrar para o proprio gol
+        moveTargetX = ball.x + 26;
+        moveTargetY = ball.y + (ball.y < midGoalY ? -30 : 30);
       } else {
-        moveTargetX = ball.x + 22;
-      }
-      if (moveTargetY === undefined) {
-        moveTargetY = futureBallY + (ball.y - midGoalY) * 0.12;
+        // Posiciona-se logo atras da bola, voltado ao gol adversario
+        moveTargetX = ball.x + 16;
+        moveTargetY = futureBallY + (ball.y - midGoalY) * 0.10;
       }
     } else {
-      // Guarda defensiva entre a bola e o próprio gol
+      // Guarda defensiva entre a bola e o proprio gol
       moveTargetX = Math.min(ownGoalX - 80, Math.max(ownGoalX - 260, ball.x + 160));
       moveTargetY = Math.max(WORLD.goalYTop - 15, Math.min(WORLD.goalYBottom + 15, (futureBallY + midGoalY) / 2));
     }
 
-    let toTargetX = (moveTargetX - this.x) + this.aiJitterX * 26;
-    let toTargetY = (moveTargetY - this.y) + this.aiJitterY * 26;
-    const len = Math.hypot(toTargetX, toTargetY);
+    // Aplica o desvio anti-travamento ao alvo
+    const targetX = moveTargetX + this.aiJitterX;
+    const targetY = moveTargetY + this.aiJitterY;
 
-    if (len > 4) {
-      input.x = toTargetX / len;
-      input.y = toTargetY / len;
-    } else if (distToBall > (this.radius + ball.radius + 4)) {
-      // Fallback anti-travamento: alvo degenerado mas a bola ainda está longe -> vai nela
-      const fbLen = distToBall || 1;
-      input.x = dxToBall / fbLen;
-      input.y = dyToBall / fbLen;
+    const toX = targetX - this.x;
+    const toY = targetY - this.y;
+    const len = Math.hypot(toX, toY);
+
+    // ZONA MORTA: precisa ser MAIOR que a derrapagem dos personagens rapidos
+    // (derrapagem ~ speed/0.34 ~ 9px). 15px garante que ele pare sem oscilar.
+    const STOP_DEADZONE = 15;
+    if (len > STOP_DEADZONE) {
+      input.x = toX / len;
+      input.y = toY / len;
     }
 
-    // Chute: rota normal (por trás da bola) OU limpeza quando ela está prensada na parede
+    // Chute: por tras da bola OU limpeza quando ela esta prensada na parede
     const inKickRange = distToBall <= (this.radius + ball.radius + 20);
-    const canKickNormal = dribbleBehindBall || this.x > ball.x - 4;
+    const canKickNormal = !cleanupKick || this.x <= ball.x - 4;
 
-    if (inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKickNormal) {
+    if (inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKickNormal && !(ball.x > this.x + 6 && !cleanupKick)) {
       input.wantKick = true;
       input.kickPower = this.kickPowerDefault !== undefined ? this.kickPowerDefault : 0.85;
-      if (!dribbleBehindBall) {
-        // Limpeza: mira o gol adversário para não empurrar a bola para o próprio gol
+      if (cleanupKick) {
         input.aim = { x: targetGoalX, y: midGoalY + (Math.random() - 0.5) * 70 };
       }
     }
 
-    input._len = Math.hypot(input.x, input.y);
-    this.aiLastLen = input._len;
+    this.aiLastLen = len > STOP_DEADZONE ? 1 : 0;
     return input;
   }
 
