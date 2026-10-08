@@ -281,6 +281,29 @@ class SoundFX {
   }
 
   // Drible de rua / caneta / chapéu
+  // Trombone triste (eliminação)
+  playSad() {
+    if (this.isMuted || !this.ctx) return;
+    try {
+      const t0 = this.ctx.currentTime;
+      [392, 370, 349, 294].forEach((f, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const dur = (i === 3) ? 0.9 : 0.36;
+        const t = t0 + i * 0.38;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, t);
+        if (i === 3) osc.frequency.linearRampToValueAtTime(f * 0.8, t + dur);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(0.22, t + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + dur);
+      });
+    } catch (e) { }
+  }
   playDribble() {
     if (this.isMuted || !this.ctx) return;
     try {
@@ -324,7 +347,11 @@ const WORLD = {
   postRadius: 6,
   // Física da Bola (Mais rápida, com deslizamento fluido e quique elástico)
   ballRadius: 11,
-  friction: 0.978,
+  friction: 0.987, // quanto mais perto de 1, mais a bola desliza
+  ballSpeedScale: 0.90, // multiplicador de velocidade da bola
+  playerSpeedScale: 0.81, // velocidade dos bonecos (0.81 = 10% mais lento que 0.90)
+  botKickPowerScale: 0.80, // forca dos chutes do bot (menor = chuta mais fraco)
+  kickDelayFrames: 60,  // espera entre um chute e outro (60 frames = ~1 segundo)
   wallRestitution: 0.80
 };
 
@@ -332,246 +359,103 @@ const WORLD = {
 // 2.1 TIMES E ESTRUTURA DA TAÇA DAS FAVELAS DE CAMPINAS
 // Catálogo oficial das comunidades e gerador de chaveamento progressivo
 // ====================================================================
-const CAMPINAS_FAVELA_TEAMS = [
-  {
-    id: 'sao-bernardo',
-    name: 'São Bernardo',
-    shortName: 'S. BERNARDO',
-    region: 'Região Sul',
-    starPlayer: 'Diguinho #10',
-    number: '10',
-    avatar: '🦅',
-    shirtColor: '#1d4ed8', // Azul Real
-    shortsColor: '#facc15', // Amarelo Dourado
-    skinTone: '#8d5524',
-    hairStyle: 'afro',
-    hairColor: '#171717',
-    tagline: 'O Gigante da Região Sul • Campeão da Taça',
-    stats: { vel: 92, chute: 90, raca: 95 },
-    description: 'Comunidade tradicionalíssima da Região Sul de Campinas, berço de campeões com toque refinado e torcida apaixonada.',
-    tier: 1
-  },
-  {
-    id: 'paranapanema',
-    name: 'Paranapanema',
-    shortName: 'PANEMA',
-    region: 'Região Sul (Colina)',
-    starPlayer: 'Vitinho #11',
-    number: '11',
-    avatar: '⚡',
-    shirtColor: '#dc2626', // Vermelho Rubi
-    shortsColor: '#18181b', // Preto
-    skinTone: '#5c3826',
-    hairStyle: 'dreads',
-    hairColor: '#171717',
-    tagline: 'O Terror da Colina • Garra e Coração',
-    stats: { vel: 95, chute: 92, raca: 98 },
-    description: 'A histórica comunidade do Panema. Time com intensidade feroz, dribles desconcertantes e uma das maiores potências de Campinas.',
-    tier: 1
-  },
-  {
-    id: 'padre-anchieta',
-    name: 'Padre Anchieta',
-    shortName: 'P. ANCHIETA',
-    region: 'Região Norte',
-    starPlayer: 'Kauã #7',
-    number: '7',
-    avatar: '🛡️',
-    shirtColor: '#0284c7', // Azul Celeste
-    shortsColor: '#ffffff', // Branco
-    skinTone: '#b5784a',
-    hairStyle: 'blonde',
-    hairColor: '#fef08a',
-    tagline: 'Gigante da Zona Norte • Atual Campeão',
-    stats: { vel: 90, chute: 94, raca: 92 },
-    description: 'Campeão da Taça das Favelas de Campinas! Time tático, com bomba de fora da área e futebol agressivo e veloz.',
-    tier: 1
-  },
-  {
-    id: 'sao-marcos',
-    name: 'São Marcos',
-    shortName: 'SÃO MARCOS',
-    region: 'Região Leste',
-    starPlayer: 'Biel #9',
-    number: '9',
-    avatar: '🦁',
-    shirtColor: '#15803d', // Verde Esmeralda
-    shortsColor: '#ffffff', // Branco
-    skinTone: '#78350f',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'A Força do São Marcos • Tradição da Quebrada',
-    stats: { vel: 89, chute: 91, raca: 94 },
-    description: 'Multicampeão com história pesada nos gramados e quadras de Campinas. Presença de área fulminante e raça pura.',
-    tier: 1
-  },
-  {
-    id: 'satelite-iris',
-    name: 'Satélite Íris',
-    shortName: 'SATÉLITE',
-    region: 'Região Noroeste',
-    starPlayer: 'Renan #8',
-    number: '8',
-    avatar: '🪐',
-    shirtColor: '#881337', // Vinho / Bordô
-    shortsColor: '#f8fafc', // Branco gelo
-    skinTone: '#a16207',
-    hairStyle: 'afro',
-    hairColor: '#1c1917',
-    tagline: 'Raça do Satélite • Orgulho do Noroeste',
-    stats: { vel: 88, chute: 88, raca: 93 },
-    description: 'Finalista emblemático de Campinas. Equipe que nunca desiste de nenhuma bola, brigando até o último apito do juiz.',
-    tier: 2
-  },
-  {
-    id: 'campo-belo',
-    name: 'Campo Belo',
-    shortName: 'CAMPO BELO',
-    region: 'Região Viracopos',
-    starPlayer: 'Bruninho #10',
-    number: '10',
-    avatar: '✈️',
-    shirtColor: '#ea580c', // Laranja Fogo
-    shortsColor: '#1e3a8a', // Azul Marinho
-    skinTone: '#6b3e26',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'Voando Alto • Força de Viracopos',
-    stats: { vel: 93, chute: 87, raca: 90 },
-    description: 'Time de velocidade relâmpago vindo da grande comunidade do Campo Belo. Contra-ataques mortais no asfalto.',
-    tier: 2
-  },
-  {
-    id: 'florence-ii',
-    name: 'Florence II',
-    shortName: 'FLORENCE',
-    region: 'Campo Grande',
-    starPlayer: 'Juninho #11',
-    number: '11',
-    avatar: '💎',
-    shirtColor: '#7c3aed', // Roxo Neon
-    shortsColor: '#ffffff', // Branco
-    skinTone: '#5c3826',
-    hairStyle: 'blonde',
-    hairColor: '#fde047',
-    tagline: 'Brilho do Campo Grande • Futebol Arte',
-    stats: { vel: 91, chute: 90, raca: 88 },
-    description: 'Dribles plásticos e magia na ponta dos pés. A comunidade do Florence traz talento puro e ousadia nas tabelas.',
-    tier: 2
-  },
-  {
-    id: 'parque-brasilia',
-    name: 'Parque Brasília',
-    shortName: 'PQ. BRASÍLIA',
-    region: 'Região Leste',
-    starPlayer: 'Pedrinho #10',
-    number: '10',
-    avatar: '🌟',
-    shirtColor: '#06b6d4', // Ciano / Azul Turquesa
-    shortsColor: '#0f172a', // Azul Noite
-    skinTone: '#b5784a',
-    hairStyle: 'afro',
-    hairColor: '#171717',
-    tagline: 'Estrela da Quebrada • Campeão da Raça',
-    stats: { vel: 90, chute: 91, raca: 91 },
-    description: 'Comunidade vibrante e unida, campeã na categoria feminina e grande potência das quadras da Zona Leste.',
-    tier: 2
-  },
-  {
-    id: 'costa-e-silva',
-    name: 'Costa e Silva',
-    shortName: 'COSTA & SILVA',
-    region: 'Região Norte',
-    starPlayer: 'Marcelinho #5',
-    number: '5',
-    avatar: '🐅',
-    shirtColor: '#eab308', // Amarelo Canário
-    shortsColor: '#18181b', // Preto
-    skinTone: '#8d5524',
-    hairStyle: 'afro',
-    hairColor: '#000000',
-    tagline: 'Guerreiros Amarelos • Marcação Pesada',
-    stats: { vel: 87, chute: 89, raca: 92 },
-    description: 'Tradição do futebol de várzea campineiro. Marcação implacável colada na quadra e chutes venenosos de média distância.',
-    tier: 3
-  },
-  {
-    id: 'dic-vi',
-    name: 'DIC VI',
-    shortName: 'DIC VI',
-    region: 'Distrito Industrial',
-    starPlayer: 'Thiaguinho #6',
-    number: '6',
-    avatar: '⚙️',
-    shirtColor: '#334155', // Cinza Chumbo
-    shortsColor: '#dc2626', // Vermelho
-    skinTone: '#a16207',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'Paredão do DIC • Força Indestrutível',
-    stats: { vel: 86, chute: 92, raca: 96 },
-    description: 'O famoso Paredão do DIC. Futebol de força física, divididas firmes e pancada na gaveta.',
-    tier: 3
-  },
-  {
-    id: 'cafezinho',
-    name: 'Cafezinho',
-    shortName: 'CAFEZINHO',
-    region: 'Região Sul',
-    starPlayer: 'Nenê #9',
-    number: '9',
-    avatar: '☕',
-    shirtColor: '#78350f', // Marrom Café
-    shortsColor: '#facc15', // Amarelo
-    skinTone: '#78350f',
-    hairStyle: 'buzz',
-    hairColor: '#171717',
-    tagline: 'Ginga Pura • Respeita a Tradição',
-    stats: { vel: 89, chute: 87, raca: 89 },
-    description: 'Time irreverente da Região Sul de Campinas, rápido nas roubadas de bola e no contragolpe.',
-    tier: 3
-  },
-  {
-    id: 'vida-nova',
-    name: 'Vida Nova',
-    shortName: 'VIDA NOVA',
-    region: 'Região Sudoeste',
-    starPlayer: 'Danilinho #7',
-    number: '7',
-    avatar: '🌱',
-    shirtColor: '#16a34a', // Verde Vivo
-    shortsColor: '#1e293b', // Grafite
-    skinTone: '#8d5524',
-    hairStyle: 'blonde',
-    hairColor: '#fef08a',
-    tagline: 'Esperança e Futuro • Muita Bola no Pé',
-    stats: { vel: 91, chute: 88, raca: 90 },
-    description: 'A energia da juventude do Sudoeste campineiro, com transições velozes e muita sede de vitória.',
-    tier: 3
-  }
+// ====================================================================
+// TIMES DA TAÇA DAS FAVELAS CAMPINAS (masculino, edição 2026)
+// Nomes das comunidades conforme divulgado na imprensa local.
+// Cores dos mantos, jogadores e atributos são fictícios (do jogo).
+// Inclui também comunidades de edições/categorias anteriores (2022–2026).
+// tier 1 = semifinalistas / campeão, 2 = quartas, 3 = demais times
+// ====================================================================
+const _TEAM_DATA = [
+  // id, nome, nome curto, camisa, calção, tier, avatar, tagline especial
+  ['padre-anchieta',  'Padre Anchieta',  'P. ANCHIETA',  '#16a34a', '#ffffff', 1, '🏆', 'Campeão da Taça 2026 👑'],
+  ['costa-e-silva',   'Costa e Silva',   'COSTA E SILVA','#1d4ed8', '#facc15', 1, '🦅', 'Vice-campeão da Taça 2026'],
+  ['dic-vi',          'DIC VI',          'DIC VI',       '#dc2626', '#111827', 1, '🔥', 'Semifinalista da Taça 2026'],
+  ['santa-lucia',     'Santa Lúcia',     'SANTA LÚCIA',  '#7c3aed', '#ffffff', 1, '⭐', 'Semifinalista da Taça 2026'],
+  ['santa-terezinha', 'Santa Terezinha', 'S. TEREZINHA', '#f97316', '#1e293b', 2, '🌟', 'Quartas de final • Taça 2026'],
+  ['nilopolis',       'Nilópolis',       'NILÓPOLIS',    '#0891b2', '#ffffff', 2, '🌊', 'Quartas de final • Taça 2026'],
+  ['cafezinho',       'Cafezinho',       'CAFEZINHO',    '#78350f', '#fde68a', 2, '☕', 'Quartas de final • Taça 2026'],
+  ['vila-rica',       'Vila Rica',       'VILA RICA',    '#eab308', '#166534', 2, '💎', 'Quartas de final • Taça 2026'],
+  ['carlos-lourenco', 'Carlos Lourenço', 'C. LOURENÇO',  '#be123c', '#ffffff', 2, '⚔️', 'Quartas de final • Taça 2026'],
+  ['sao-jose',        'São José',        'SÃO JOSÉ',     '#2563eb', '#ffffff', 3, '🛡️', ''],
+  ['paranapanema',    'Paranapanema',    'PANEMA',       '#059669', '#facc15', 3, '⚡', ''],
+  ['jardim-rosalia',  'Jardim Rosália',  'J. ROSÁLIA',   '#db2777', '#1e293b', 3, '🌹', ''],
+  ['san-martins',     'San Martins',     'SAN MARTINS',  '#475569', '#f97316', 3, '🐺', ''],
+  ['florence-ii',     'Florence II',     'FLORENCE II',  '#0ea5e9', '#111827', 3, '🌸', ''],
+  ['parque-oziel',    'Parque Oziel',    'PQ. OZIEL',    '#84cc16', '#1e3a8a', 3, '🌳', ''],
+  ['vista-alegre',    'Vista Alegre',    'VISTA ALEGRE', '#facc15', '#1d4ed8', 3, '☀️', ''],
+  ['vila-vitoria',    'Vila Vitória',    'VILA VITÓRIA', '#e11d48', '#facc15', 3, '🥇', ''],
+  ['jardim-shangai',  'Jardim Shangai',  'J. SHANGAI',   '#9333ea', '#facc15', 3, '🐉', ''],
+  ['vila-31-marco',   'Vila 31 de Março','31 DE MARÇO',  '#0f766e', '#ffffff', 3, '📅', ''],
+  ['jardim-capivari', 'Jardim Capivari', 'J. CAPIVARI',  '#15803d', '#1e293b', 3, '🐾', ''],
+  ['campo-belo',      'Campo Belo',      'CAMPO BELO',   '#ea580c', '#ffffff', 3, '🏟️', ''],
+  // --- Demais comunidades que já disputaram a Taça (2022–2026) ---
+  ['sao-marcos',          'São Marcos',          'SÃO MARCOS',    '#1e3a8a', '#ffffff', 2, '🦁', 'Finalista feminino 2026 • já foi campeão da Taça'],
+  ['parque-brasilia',     'Parque Brasília',     'PQ. BRASÍLIA',  '#22d3ee', '#0f172a', 2, '🌟', 'Campeão feminino da Taça 2026'],
+  ['vila-bela',           'Vila Bela',           'VILA BELA',     '#a21caf', '#facc15', 2, '🌺', 'Bicampeão da Taça (final de 2025)'],
+  ['vila-brandina',       'Vila Brandina',       'V. BRANDINA',   '#0e7490', '#fde68a', 3, '🏠', 'Campeão da 1ª Taça (2019)'],
+  ['sao-bernardo',        'São Bernardo',        'S. BERNARDO',   '#4f46e5', '#fef08a', 3, '🦅', 'Finalista da Taça 2022'],
+  ['satelite-iris',       'Satélite Íris',       'SATÉLITE ÍRIS', '#881337', '#f8fafc', 3, '🪐', 'Finalista da Taça 2022'],
+  ['santa-barbara',       'Santa Bárbara',       'S. BÁRBARA',    '#c2410c', '#1e293b', 3, '🔔', 'Semifinalista da Taça 2022'],
+  ['boa-vista',           'Boa Vista',           'BOA VISTA',     '#65a30d', '#ffffff', 3, '🔭', 'Participou da Taça 2025'],
+  ['novo-mundo',          'Novo Mundo',          'NOVO MUNDO',    '#0369a1', '#fde047', 3, '🌎', 'Participou da Taça 2025'],
+  ['eulina',              'Eulina',              'EULINA',        '#b45309', '#ffffff', 3, '🎯', 'Participou da Taça 2025'],
+  ['vila-esperanca',      'Vila Esperança',      'V. ESPERANÇA',  '#4ade80', '#14532d', 3, '🕊️', 'Presente na Taça 2026 (feminino)'],
+  ['parque-universitario','Parque Universitário','PQ. UNIVERSIT.', '#7e22ce', '#e9d5ff', 3, '🎓', 'Presente na Taça 2026 (feminino)']
 ];
+
+const _STAR_NAMES = ['Diguinho','Vitinho','Kauã','Pedrinho','Juninho','Lucão','Nickão','Guto','Rafinha','Tiaguinho','Biel','Dudu','Cauê','Léo','Matheuzinho','Caio','Davi','Ryan','Bruninho','Théo','Enzo','Nenê','Marcelinho','Renan','Danilinho','Wesley','Gabriel','Joãozinho','Miguel','Arthur','Samuel','Yago','Luan'];
+const _SKINS = ['#8d5524', '#c68642', '#a16207', '#5c3a1e', '#e0ac69', '#7b4a2b'];
+const _HAIRS = ['afro', 'buzz', 'dreads', 'blonde', 'buzz', 'afro'];
+const _HAIR_COLORS = { afro: '#171717', buzz: '#1c1917', dreads: '#292524', blonde: '#fef08a' };
+const _NUMBERS = ['10', '7', '9', '11', '8', '5', '6'];
+
+const CAMPINAS_FAVELA_TEAMS = _TEAM_DATA.map((d, i) => {
+  const [id, name, shortName, shirt, shorts, tier, avatar, special] = d;
+  const hair = _HAIRS[i % _HAIRS.length];
+  const base = tier === 1 ? 91 : (tier === 2 ? 87 : 83);
+  const wob = (k) => base + ((i * 7 + k * 5) % 7);
+  const star = _STAR_NAMES[i % _STAR_NAMES.length];
+  const number = _NUMBERS[i % _NUMBERS.length];
+  return {
+    id, name, shortName,
+    region: 'Campinas • SP',
+    starPlayer: `${star} #${number}`,
+    number,
+    avatar,
+    shirtColor: shirt,
+    shortsColor: shorts,
+    skinTone: _SKINS[i % _SKINS.length],
+    hairStyle: hair,
+    hairColor: _HAIR_COLORS[hair],
+    tagline: special || 'Taça das Favelas Campinas 2026',
+    stats: { vel: wob(1), chute: wob(2), raca: wob(3) },
+    description: `${name} representa a quebrada na Taça das Favelas de Campinas. ${special || 'Time de garra, bola no chão e muita vontade de levantar o troféu.'}`,
+    tier
+  };
+});
+
+function _pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function generateCampinasTournamentRounds(userTeamId) {
   const userTeam = CAMPINAS_FAVELA_TEAMS.find(t => t.id === userTeamId) || CAMPINAS_FAVELA_TEAMS[0];
   const availableTeams = CAMPINAS_FAVELA_TEAMS.filter(t => t.id !== userTeam.id);
 
-  // Pool Tier 3 (Oitavas)
-  const tier3 = availableTeams.filter(t => t.tier === 3);
-  const round1Team = tier3[Math.floor(Math.random() * tier3.length)] || availableTeams[0];
-
-  // Pool Tier 2 (Quartas)
-  const tier2 = availableTeams.filter(t => t.tier === 2 && t.id !== round1Team.id);
-  const round2Team = (tier2.length > 0 ? tier2 : availableTeams.filter(t => t.id !== round1Team.id))[0];
-
-  // Pool Semifinal (Times fortes diferentes dos anteriores)
-  const semiPool = availableTeams.filter(t => t.id !== round1Team.id && t.id !== round2Team.id);
-  const semiCandidates = semiPool.filter(t => t.tier <= 2);
-  const round3Team = (semiCandidates.length > 0 ? semiCandidates : semiPool)[0];
-
-  // Pool Final (Gigantes da Quebrada: Paranapanema, São Bernardo, Padre Anchieta, São Marcos)
-  const finalPool = availableTeams.filter(t => t.id !== round1Team.id && t.id !== round2Team.id && t.id !== round3Team.id);
-  const finalGiants = finalPool.filter(t => t.tier === 1);
-  const round4Team = (finalGiants.length > 0 ? finalGiants : finalPool)[0] || finalPool[0];
+  // Oitavas: times de nível 3
+  const used = new Set();
+  const take = (pool) => {
+    const free = pool.filter(t => !used.has(t.id));
+    const t = _pickRandom(free.length ? free : availableTeams.filter(x => !used.has(x.id)));
+    used.add(t.id);
+    return t;
+  };
+  const round1Team = take(availableTeams.filter(t => t.tier === 3));
+  // Quartas: times de nível 2
+  const round2Team = take(availableTeams.filter(t => t.tier === 2));
+  // Semifinal: nível 2 ou 1
+  const round3Team = take(availableTeams.filter(t => t.tier <= 2));
+  // Final: os gigantes (nível 1)
+  const round4Team = take(availableTeams.filter(t => t.tier === 1));
 
   return [
     {
@@ -597,8 +481,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round1Team.shortsColor,
         hairStyle: round1Team.hairStyle,
         hairColor: round1Team.hairColor,
-        speed: 2.55,
-        kickPowerMax: 10.5,
+        speed: 1.65,
+        kickPowerMax: 6.8,
         aiLeadFrames: 3,
         aiAttackDist: 210,
         kickPowerDefault: 0.65
@@ -627,8 +511,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round2Team.shortsColor,
         hairStyle: round2Team.hairStyle,
         hairColor: round2Team.hairColor,
-        speed: 2.80,
-        kickPowerMax: 12.5,
+        speed: 1.80,
+        kickPowerMax: 8.0,
         aiLeadFrames: 6,
         aiAttackDist: 275,
         kickPowerDefault: 0.80
@@ -657,8 +541,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round3Team.shortsColor,
         hairStyle: round3Team.hairStyle,
         hairColor: round3Team.hairColor,
-        speed: 3.00,
-        kickPowerMax: 14.0,
+        speed: 1.90,
+        kickPowerMax: 9.0,
         aiLeadFrames: 9,
         aiAttackDist: 345,
         kickPowerDefault: 0.92
@@ -687,8 +571,8 @@ function generateCampinasTournamentRounds(userTeamId) {
         shortsColor: round4Team.shortsColor,
         hairStyle: round4Team.hairStyle,
         hairColor: round4Team.hairColor,
-        speed: 3.25,
-        kickPowerMax: 14.8,
+        speed: 2.05,
+        kickPowerMax: 9.4,
         aiLeadFrames: 12,
         aiAttackDist: 430,
         kickPowerDefault: 1.0
@@ -697,7 +581,37 @@ function generateCampinasTournamentRounds(userTeamId) {
   ];
 }
 
-let TOURNAMENT_ROUNDS = generateCampinasTournamentRounds('sao-bernardo');
+let TOURNAMENT_ROUNDS = generateCampinasTournamentRounds('padre-anchieta');
+
+// Dificuldades do 1 JOGADOR x CPU (o MÉDIO é o comportamento padrão anterior)
+// Gol de Ouro dura 20 segundos; se ninguém marcar, vai para os pênaltis
+const GOLDEN_GOAL_SECONDS = 20;
+
+// Geometria da cobrança de pênalti (gol da direita)
+const PEN = {
+  spotX: WORLD.courtRight - 65,
+  spotY: (WORLD.goalYTop + WORLD.goalYBottom) / 2,
+  goalX: WORLD.courtRight,
+  zones: { up: WORLD.goalYTop + 28, mid: (WORLD.goalYTop + WORLD.goalYBottom) / 2, down: WORLD.goalYBottom - 28 },
+  half: { up: 38, mid: 34, down: 38 }
+};
+// Campos (cenários) disponíveis. Visual estilizado do jogo.
+//  - quadra:   quadra de cimento cercada pela favela (padrão)
+//  - argemiro: Praça de Esportes Argemiro Roque (São Bernardo), sede dos jogos da Taça
+//  - brinco:   Estádio Brinco de Ouro da Princesa, palco das finais da Taça
+const VENUES = {
+  quadra:   { name: 'QUADRA DA QUEBRADA',    surface: ['#475569', '#3b4354', '#2f3543'], line: '#ffffff', label: '★ BEIÇO STREET ★',     labelColor: 'rgba(250, 204, 21, 0.22)',  stripes: false, kind: 'favela' },
+  argemiro: { name: 'PRAÇA ARGEMIRO ROQUE',  surface: ['#1d4ed8', '#1e40af', '#1e3a8a'], line: '#f8fafc', label: '★ TAÇA DAS FAVELAS ★', labelColor: 'rgba(255, 255, 255, 0.28)', stripes: false, kind: 'favela' },
+  brinco:   { name: 'BRINCO DE OURO',        surface: ['#15803d', '#16a34a', '#15803d'], line: '#ffffff', label: '★ GRANDE FINAL ★',     labelColor: 'rgba(255, 255, 255, 0.22)', stripes: true,  kind: 'stadium' }
+};
+let CURRENT_VENUE = 'quadra';
+
+const DIFFICULTIES = {
+  easy:   { label: 'FÁCIL',     speed: 1.35, kickPowerMax: 7.0,  aiLeadFrames: 2,  aiAttackDist: 170, kickPowerDefault: 0.55, aiReactionFrames: 26 },
+  medium: { label: 'MÉDIO',     speed: 1.90, kickPowerMax: 9.0,  aiLeadFrames: 8,  aiAttackDist: 260, kickPowerDefault: 0.85, aiReactionFrames: 15 },
+  hard:   { label: 'DIFÍCIL',   speed: 2.05, kickPowerMax: 9.4,  aiLeadFrames: 11, aiAttackDist: 380, kickPowerDefault: 0.95, aiReactionFrames: 9 },
+  legend: { label: 'LENDÁRIO',  speed: 2.20, kickPowerMax: 10.0, aiLeadFrames: 14, aiAttackDist: 480, kickPowerDefault: 1.0, aiReactionFrames: 5 }
+};
 
 // ====================================================================
 // 3. SISTEMA DE PARTÍCULAS E EFEITOS VISUAIS
@@ -742,6 +656,16 @@ class ParticleSystem {
     }
   }
 
+  // Fogos de artifício (campeão)
+  addFirework(x, y) {
+    const cols = ['#ffe600', '#00ff88', '#ff0055', '#00e5ff', '#ffffff', '#ff9900'];
+    const c = cols[Math.floor(Math.random() * cols.length)];
+    for (let i = 0; i < 46; i++) {
+      const a = (i / 46) * Math.PI * 2;
+      const sp = 2 + Math.random() * 3.2;
+      this.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, radius: 2.6, color: c, life: 1.0, decay: 0.012 + Math.random() * 0.01 });
+    }
+  }
   // Chuva de confetes na comemoração de Gol
   triggerGoalConfetti() {
     const colors = ['#ffe600', '#00ff88', '#ff0055', '#00e5ff', '#ffffff', '#ff9900'];
@@ -862,8 +786,8 @@ class Ball {
     }
 
     // Movimentação
-    this.x += this.vx;
-    this.y += this.vy;
+    this.x += this.vx * WORLD.ballSpeedScale;
+    this.y += this.vy * WORLD.ballSpeedScale;
 
     // Rotação visual
     this.rotation += speed * 0.1;
@@ -1068,14 +992,16 @@ class Player {
     this.vy = 0;
     this.facingAngle = config.team === 'beico' ? 0 : Math.PI;
     this.radius = 18; // Raio físico do jogador
-    this.speed = config.speed !== undefined ? config.speed : 3.0; // AUMENTADO (antes 2.04): bonecos mais rapidos
-    this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 14.5;
-    this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 5.5;
+    this.speed = config.speed !== undefined ? config.speed : 1.9; // AUMENTADO (antes 2.04): bonecos mais rapidos
+    this.kickPowerMax = config.kickPowerMax !== undefined ? config.kickPowerMax : 9.0;
+    this.kickPowerMin = config.kickPowerMin !== undefined ? config.kickPowerMin : 3.8;
 
     // Atributos de Inteligência Artificial para o Torneio
     this.aiLeadFrames = config.aiLeadFrames !== undefined ? config.aiLeadFrames : 8;
     this.aiAttackDist = config.aiAttackDist !== undefined ? config.aiAttackDist : 260;
     this.kickPowerDefault = config.kickPowerDefault !== undefined ? config.kickPowerDefault : 0.85;
+    this.aiReactionFrames = config.aiReactionFrames !== undefined ? config.aiReactionFrames : 12; // frames 'armando' o chute antes de bater
+    this.aiWindup = 0;
 
     // Visual / Aparência (100% mantido)
     this.skinTone = config.skinTone || '#8d5524';
@@ -1119,6 +1045,9 @@ class Player {
     this.kickCharge = 0;
     this.prevKickHeld = false;
 
+    this.pose = null;
+    this.poseT = 0;
+    this.poseTilt = 0;
     // Zera a memoria da IA a cada reinicio de jogada
     this.aiState = 'CHASE';
     this.aiStuckTimer = 0;
@@ -1127,6 +1056,7 @@ class Player {
     this.aiJitterX = 0;
     this.aiJitterY = 0;
     this.aiLastLen = 0;
+    this.aiWindup = 0;
   }
 
   update(inputKeys, ball, players, particles) {
@@ -1202,8 +1132,8 @@ class Player {
       moveX /= len;
       moveY /= len;
       this.facingAngle = Math.atan2(moveY, moveX);
-      const targetVx = moveX * this.speed;
-      const targetVy = moveY * this.speed;
+      const targetVx = moveX * this.speed * WORLD.playerSpeedScale;
+      const targetVy = moveY * this.speed * WORLD.playerSpeedScale;
       // Aceleração suave e cadência de passos sincronizada com velocidade lenta
       this.vx += (targetVx - this.vx) * 0.34;
       this.vy += (targetVy - this.vy) * 0.34;
@@ -1308,7 +1238,7 @@ class Player {
       // kickAnimTimer protege a bola da colisão do próprio chutador por 16 frames
       this.kickAnimTimer = 16;
       // Cooldown curto de apenas 8 frames (~0.13s) permite espamar chutes rápidos e fluidos sem travar a bola!
-      this.kickCooldown = 8;
+      this.kickCooldown = WORLD.kickDelayFrames; // 1 segundo ate poder chutar de novo
 
       audio.playKick(chargePct);
       if (game) game.triggerShake(chargePct > 0.65 ? 6 : 3);
@@ -1328,27 +1258,38 @@ class Player {
     const dx = ball.x - this.x;
     const dy = ball.y - this.y;
     const dist = Math.hypot(dx, dy);
-    const kickRange = this.radius + ball.radius + 20;
+    const kickRange = this.radius + ball.radius + 10;
 
     if (dist <= kickRange && dist > 0) {
       const minPower = this.kickPowerMin;
       const maxPower = this.kickPowerMax;
-      const totalPower = minPower + powerPct * (maxPower - minPower);
+      const totalPower = (minPower + powerPct * (maxPower - minPower)) * WORLD.botKickPowerScale;
 
-      let dirX;
-      let dirY;
+      // Normal corpo -> bola (usada para posicionar a bola SEM teleportar)
+      const nx = dx / dist;
+      const ny = dy / dist;
+      let dirX = nx;
+      let dirY = ny;
+
       if (aim) {
-        const aimLen = Math.hypot(aim.x - ball.x, aim.y - ball.y) || 1;
-        dirX = (aim.x - ball.x) / aimLen;
-        dirY = (aim.y - ball.y) / aimLen;
-      } else {
-        dirX = dx / dist;
-        dirY = dy / dist;
+        let ax = aim.x - ball.x;
+        let ay = aim.y - ball.y;
+        const al = Math.hypot(ax, ay) || 1;
+        ax /= al; ay /= al;
+        // Nunca chuta "para dentro" do proprio corpo: desvia para fora
+        if (ax * nx + ay * ny < 0.35) {
+          ax += nx * 0.9;
+          ay += ny * 0.9;
+          const l = Math.hypot(ax, ay) || 1;
+          ax /= l; ay /= l;
+        }
+        dirX = ax;
+        dirY = ay;
       }
 
-      // Descola imediatamente a bola do corpo da IA
-      ball.x = this.x + dirX * (this.radius + ball.radius + 6);
-      ball.y = this.y + dirY * (this.radius + ball.radius + 6);
+      // Descola a bola do corpo ao longo da normal (sem pular para tras do bot)
+      ball.x = this.x + nx * (this.radius + ball.radius + 6);
+      ball.y = this.y + ny * (this.radius + ball.radius + 6);
 
       ball.vx = dirX * totalPower + this.vx * 0.20;
       ball.vy = dirY * totalPower + this.vy * 0.20;
@@ -1356,12 +1297,11 @@ class Player {
       ball.lastTouchPlayer = this;
 
       this.kickAnimTimer = 16;
-      this.kickCooldown = 16; // Cooldown menor: a IA joga mais solta e não trava
+      this.kickCooldown = WORLD.kickDelayFrames; // 1 segundo ate poder chutar de novo
       audio.playKick(powerPct);
       if (game) game.triggerShake(powerPct > 0.75 ? 6 : 3);
       particles.addSparks(ball.x, ball.y, ball.vx, ball.vy, 10);
     } else {
-      // Chute no vácuo: nunca deixa a IA travada esperando alcance
       this.kickAnimTimer = 6;
       this.kickCooldown = 0;
     }
@@ -1371,6 +1311,8 @@ class Player {
   handleBallContact(ball, particles) {
     // Se o jogador acabou de chutar a bola, não interceptar a saída dela!
     if (this.kickAnimTimer > 0) return;
+    // Bot (CPU) NAO tem contato de corpo com a bola: so mexe nela chutando
+    if (!this.isControlled) return;
 
     const dx = ball.x - this.x;
     const dy = ball.y - this.y;
@@ -1401,7 +1343,7 @@ class Player {
       // 3. Condução ao avançar sobre a bola
       const playerSpeed = Math.hypot(this.vx, this.vy);
       const pushDot = this.vx * nx + this.vy * ny;
-      if (pushDot > 0) {
+      if (pushDot > 0 && this.isControlled) {
         ball.vx += this.vx * 0.42;
         ball.vy += this.vy * 0.42;
       }
@@ -1421,9 +1363,18 @@ class Player {
   computeAI(ball, players) {
     const input = { x: 0, y: 0, wantKick: false, kickPower: 0.85, aim: null };
 
-    const ownGoalX = WORLD.courtRight; // 1180
-    const targetGoalX = WORLD.courtLeft; // 120
+    const ownGoalX = WORLD.courtRight;   // gol que a IA defende (direita)
+    const targetGoalX = WORLD.courtLeft; // gol que a IA ataca (esquerda)
     const midGoalY = (WORLD.goalYTop + WORLD.goalYBottom) / 2;
+    const S = WORLD.ballSpeedScale || 1;
+
+    // Limites onde o corpo da IA consegue realmente chegar (evita alvo inalcancavel = travar)
+    const minPX = WORLD.courtLeft + this.radius + 2;
+    const maxPX = WORLD.courtRight - this.radius - 2;
+    const minPY = WORLD.courtTop + this.radius + 2;
+    const maxPY = WORLD.courtBottom - this.radius - 2;
+    const clampX = (v) => Math.max(minPX, Math.min(maxPX, v));
+    const clampY = (v) => Math.max(minPY, Math.min(maxPY, v));
 
     const dxToBall = ball.x - this.x;
     const dyToBall = ball.y - this.y;
@@ -1444,34 +1395,34 @@ class Player {
     this.aiPrevX = this.x;
     this.aiPrevY = this.y;
 
-    // Desvio anti-travamento suave e persistente (perpendicular a direcao da bola)
-    if (this.aiStuckTimer > 45) {
+    // Desvio anti-travamento suave (perpendicular a direcao da bola)
+    if (this.aiStuckTimer > 40) {
       const pl = distToBall || 1;
-      this.aiJitterX = (-dyToBall / pl) * 26 * this.aiJitterSide;
-      this.aiJitterY = (dxToBall / pl) * 26 * this.aiJitterSide;
+      this.aiJitterX = (-dyToBall / pl) * 34 * this.aiJitterSide;
+      this.aiJitterY = (dxToBall / pl) * 34 * this.aiJitterSide;
       this.aiStuckTimer = 0;
       this.aiJitterSide = -this.aiJitterSide;
     }
     if (Math.abs(this.aiJitterX) > 0.3 || Math.abs(this.aiJitterY) > 0.3) {
-      this.aiJitterX *= 0.94;
-      this.aiJitterY *= 0.94;
+      this.aiJitterX *= 0.95;
+      this.aiJitterY *= 0.95;
     } else {
       this.aiJitterX = 0;
       this.aiJitterY = 0;
     }
 
-    // Antecipacao da trajetoria da bola calibrada pelos atributos de inteligencia da fase
-    const lead = this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8;
-    const futureBallX = ball.x + ball.vx * lead;
-    const futureBallY = ball.y + ball.vy * lead;
+    // Antecipacao da trajetoria da bola (limitada para nao mirar fora da quadra)
+    const lead = (this.aiLeadFrames !== undefined ? this.aiLeadFrames : 8) * S;
+    const futureBallY = Math.max(WORLD.courtTop + 20, Math.min(WORLD.courtBottom - 20, ball.y + ball.vy * lead));
 
     const opponentJustKicked = ball.lastTouchPlayer && ball.lastTouchPlayer !== this && ball.lastTouchPlayer.kickAnimTimer > 8;
 
     const ballSpeed = Math.hypot(ball.vx, ball.vy);
-    const ballAtRest = ballSpeed < 0.35;
+    const ballAtRest = ballSpeed < 1.2; // limiar maior: nao fica alternando atacar/defender com a bola quase parada
     const ballInOurHalf = ball.x > (WORLD.courtLeft + WORLD.courtRight) / 2;
-    const ballDangerous = ball.vx > 1.2 && ball.x > 800;
+    const ballDangerous = ball.vx > 1.5 && ball.x > 800;
     const ballPinnedRightWall = ball.x > WORLD.courtRight - (this.radius + ball.radius + 34);
+    const ballBehindUs = ball.x > this.x + 6; // bola entre a IA e o proprio gol
 
     const attackDist = this.aiAttackDist !== undefined ? this.aiAttackDist : 260;
 
@@ -1481,11 +1432,14 @@ class Player {
     } else if (ballAtRest || ballDangerous || distToBall < attackDist) {
       this.aiState = 'CHASE';
     }
-    if (ballAtRest) this.aiState = 'CHASE'; // bola morta no chao: sempre vai buscar
+    if (ballAtRest) this.aiState = 'CHASE';
 
-    const shouldAttackBall = (this.aiState === 'CHASE')
+    // Depois de chutar o bot recua um pouco (so volta antes se a bola ameaca o gol dele)
+    const recovering = this.kickCooldown > 0 && !ballDangerous;
+
+    const shouldAttackBall = !recovering && ((this.aiState === 'CHASE')
       || ballDangerous
-      || (!ballInOurHalf && distToBall < (attackDist + 160));
+      || (!ballInOurHalf && distToBall < (attackDist + 160)));
 
     let moveTargetX;
     let moveTargetY;
@@ -1493,17 +1447,22 @@ class Player {
 
     if (shouldAttackBall) {
       if (ballPinnedRightWall) {
-        // Bola presa na parede: posiciona a esquerda e limpa mirando o gol adversario
-        moveTargetX = ball.x - 20;
-        moveTargetY = ball.y + (ball.y < midGoalY ? -10 : 10);
+        // Bola colada na parede da direita: a IA nao consegue ficar atras dela.
+        // Vai para o lado (cima/baixo) oposto ao gol adversario e chuta em diagonal.
+        const room = (side) => side < 0 ? (ball.y - WORLD.courtTop) : (WORLD.courtBottom - ball.y);
+        let side = ball.y < midGoalY ? -1 : 1;
+        if (room(side) < 44) side = -side;
+        moveTargetX = ball.x - 4;
+        moveTargetY = ball.y + side * 30;
         cleanupKick = true;
-      } else if (ball.x > this.x + 6) {
-        // Bola ja passou pela IA: contorna para nao empurrar para o proprio gol
+      } else if (ballBehindUs) {
+        // Bola entre a IA e o proprio gol: contorna por fora (nunca empurra pro proprio gol)
+        const side = ball.y < midGoalY ? 1 : -1;
         moveTargetX = ball.x + 26;
-        moveTargetY = ball.y + (ball.y < midGoalY ? -30 : 30);
+        moveTargetY = ball.y + side * 34;
       } else {
         // Posiciona-se logo atras da bola, voltado ao gol adversario
-        moveTargetX = ball.x + 16;
+        moveTargetX = ball.x + 26;
         moveTargetY = futureBallY + (ball.y - midGoalY) * 0.10;
       }
     } else {
@@ -1512,27 +1471,30 @@ class Player {
       moveTargetY = Math.max(WORLD.goalYTop - 15, Math.min(WORLD.goalYBottom + 15, (futureBallY + midGoalY) / 2));
     }
 
-    // Aplica o desvio anti-travamento ao alvo
-    const targetX = moveTargetX + this.aiJitterX;
-    const targetY = moveTargetY + this.aiJitterY;
+    // Aplica o desvio anti-travamento e garante alvo alcancavel
+    const targetX = clampX(moveTargetX + this.aiJitterX);
+    const targetY = clampY(moveTargetY + this.aiJitterY);
 
     const toX = targetX - this.x;
     const toY = targetY - this.y;
     const len = Math.hypot(toX, toY);
 
-    // ZONA MORTA: precisa ser MAIOR que a derrapagem dos personagens rapidos
-    // (derrapagem ~ speed/0.34 ~ 9px). 15px garante que ele pare sem oscilar.
-    const STOP_DEADZONE = 15;
+    // ZONA MORTA maior que a derrapagem do personagem: chega, para e chuta sem tremer
+    const STOP_DEADZONE = (shouldAttackBall && distToBall < 90) ? 7 : 15;
     if (len > STOP_DEADZONE) {
       input.x = toX / len;
       input.y = toY / len;
     }
 
     // Chute: por tras da bola OU limpeza quando ela esta prensada na parede
-    const inKickRange = distToBall <= (this.radius + ball.radius + 20);
-    const canKickNormal = !cleanupKick || this.x <= ball.x - 4;
+    const inKickRange = distToBall <= (this.radius + ball.radius + 10);
+    const canKick = cleanupKick || !ballBehindUs;
 
-    if (inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKickNormal && !(ball.x > this.x + 6 && !cleanupKick)) {
+    // Tempo de reacao: precisa ficar encostado na bola alguns frames antes de chutar
+    const readyToKick = inKickRange && this.kickCooldown <= 0 && !opponentJustKicked && canKick;
+    this.aiWindup = readyToKick ? this.aiWindup + 1 : 0;
+
+    if (readyToKick && this.aiWindup >= this.aiReactionFrames) {
       input.wantKick = true;
       input.kickPower = this.kickPowerDefault !== undefined ? this.kickPowerDefault : 0.85;
       if (cleanupKick) {
@@ -1567,7 +1529,7 @@ class Player {
     ctx.restore();
 
     // 2. Anel de Destaque para Jogador Controlado com Indicador de Força e Recarga
-    if (this.isControlled) {
+    if (this.isControlled && !(window.game && (window.game.state === 'PENALTIES' || window.game.state === 'CELEBRATION'))) {
       ctx.save();
       const ringColor = this.controlId === 1 ? '#facc15' : '#ef4444';
 
@@ -1631,6 +1593,13 @@ class Player {
     ctx.save();
     ctx.translate(this.x, this.y);
 
+    // Poses especiais (pênalti / celebração)
+    const pose = this.pose || null;
+    const pt = this.poseT || 0;
+    if (pose === 'happy') ctx.translate(0, -Math.abs(Math.sin(pt * 0.18)) * 16);
+    else if (pose === 'sad') { ctx.translate(2 + Math.sin(pt * 0.9) * 0.8, 8); ctx.rotate(0.22); ctx.scale(1, 0.9); }
+    else if (pose === 'trophy') ctx.translate(0, -Math.abs(Math.sin(pt * 0.08)) * 4);
+    else if (pose === 'keeper') ctx.rotate(this.poseTilt || 0);
     // Inclinação de corrida na direção do movimento (lean)
     if (isMoving) {
       const lean = (isFacingLeft ? -1 : 1) * Math.min(0.18, speed * 0.08) + (isFacingUp ? -0.05 : 0.05);
@@ -1710,10 +1679,12 @@ class Player {
 
     // Cabelo / Boné do Cria (orientado na diagonal)
     this.drawHair(ctx, isFacingUp, isDiagonal);
+    this.drawPoseExtras(ctx, pose, pt);
 
     ctx.restore();
 
     // 4. Nome do Jogador em Cima
+    if (this.pose && this.pose !== 'keeper') return;
     ctx.save();
     ctx.font = 'bold 10px Outfit';
     ctx.textAlign = 'center';
@@ -1724,6 +1695,69 @@ class Player {
     ctx.restore();
   }
 
+  // Braços, troféu, lágrimas e luvas das poses especiais
+  drawPoseExtras(ctx, pose, pt) {
+    if (!pose) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = this.skinTone;
+    ctx.fillStyle = this.skinTone;
+    ctx.lineWidth = 4.5;
+    if (pose === 'happy') {
+      const w = Math.sin(pt * 0.35) * 5;
+      ctx.beginPath();
+      ctx.moveTo(-10, -16); ctx.lineTo(-19, -37 + w);
+      ctx.moveTo(10, -16); ctx.lineTo(19, -37 - w);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(-19, -37 + w, 3, 0, Math.PI * 2); ctx.arc(19, -37 - w, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#7f1d1d'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0, -22.5, 3.6, 0.1, Math.PI - 0.1); ctx.stroke();
+    } else if (pose === 'trophy') {
+      ctx.beginPath();
+      ctx.moveTo(-10, -16); ctx.lineTo(-7, -43);
+      ctx.moveTo(10, -16); ctx.lineTo(7, -43);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(0, -52);
+      ctx.scale(1.6, 1.6);
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(-9, -12); ctx.lineTo(9, -12);
+      ctx.quadraticCurveTo(9, 2, 0, 4);
+      ctx.quadraticCurveTo(-9, 2, -9, -12);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(-9.5, -7, 4.5, Math.PI * 0.5, Math.PI * 1.5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(9.5, -7, 4.5, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
+      ctx.fillStyle = '#f59e0b'; ctx.fillRect(-1.8, 4, 3.6, 5);
+      ctx.fillStyle = '#92400e'; ctx.fillRect(-6, 9, 12, 3.5);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)'; ctx.fillRect(-5.5, -10, 2.2, 9);
+      ctx.restore();
+      ctx.fillStyle = this.skinTone;
+      ctx.beginPath(); ctx.arc(-7, -43, 3, 0, Math.PI * 2); ctx.arc(7, -43, 3, 0, Math.PI * 2); ctx.fill();
+    } else if (pose === 'sad') {
+      ctx.beginPath();
+      ctx.moveTo(-9, -15); ctx.lineTo(-3.5, -24);
+      ctx.moveTo(9, -15); ctx.lineTo(3.5, -24);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(-3.5, -24.5, 3.4, 0, Math.PI * 2); ctx.arc(3.5, -24.5, 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.95)';
+      for (let i = 0; i < 4; i++) {
+        const side = (i % 2 === 0) ? -1 : 1;
+        const ph = ((pt * 0.5 + i * 7) % 22);
+        ctx.beginPath(); ctx.arc(side * 5.5, -20 + ph, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (pose === 'keeper') {
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-10, -15); ctx.lineTo(-25, -22);
+      ctx.moveTo(10, -15); ctx.lineTo(25, -22);
+      ctx.stroke();
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath(); ctx.arc(-26, -22.5, 4.2, 0, Math.PI * 2); ctx.arc(26, -22.5, 4.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
   drawHair(ctx, isFacingUp = false, isDiagonal = false) {
     ctx.fillStyle = this.hairColor;
     if (this.hairStyle === 'afro') {
@@ -1839,6 +1873,13 @@ class FavelaScenery {
   }
 
   draw(ctx, width, height) {
+    if (VENUES[CURRENT_VENUE].kind === 'stadium') {
+      this.drawSkyAndSun(ctx);
+      this.drawStadium(ctx);
+      this.drawCourt(ctx);
+      this.drawGoals(ctx);
+      return;
+    }
     // 1. Céu Tropical Panorâmico de Dia Ensolarado com Sol, Nuvens e Pipas
     this.drawSkyAndSun(ctx);
 
@@ -1871,6 +1912,75 @@ class FavelaScenery {
 
     // 11. Traves e Redes dos Gols
     this.drawGoals(ctx);
+  }
+
+  // Estádio (Brinco de Ouro): arquibancadas lotadas, placas de publicidade e refletores.
+  // Desenhado uma única vez num canvas em cache.
+  drawStadium(ctx) {
+    if (!this._stadiumCache) {
+      const c = document.createElement('canvas');
+      c.width = 2500; c.height = 1100;
+      const g = c.getContext('2d');
+      g.translate(600, 100);
+      let seed = 777;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const fanCols = ['#facc15', '#00a859', '#1f4fe0', '#ffffff', '#ef4444', '#f97316', '#e2e8f0'];
+      const cl = WORLD.courtLeft, cr = WORLD.courtRight, ct = WORLD.courtTop, cb = WORLD.courtBottom;
+
+      g.fillStyle = '#1f2937';
+      g.fillRect(-600, 20, 2500, 980);
+
+      const stand = (x, y, w, h) => {
+        g.fillStyle = '#334155';
+        g.fillRect(x, y, w, h);
+        for (let yy = y + 8; yy < y + h - 6; yy += 15) {
+          g.fillStyle = 'rgba(0, 0, 0, 0.25)';
+          g.fillRect(x, yy + 11, w, 3);
+          for (let xx = x + 6; xx < x + w - 6; xx += 13) {
+            if (rnd() < 0.12) continue;
+            g.fillStyle = fanCols[Math.floor(rnd() * fanCols.length)];
+            g.fillRect(xx - 4, yy + 3, 8, 8);
+            g.fillStyle = '#8d5524';
+            g.beginPath(); g.arc(xx, yy, 3.6, 0, Math.PI * 2); g.fill();
+          }
+        }
+      };
+      stand(-600, 24, 2500, ct - 24 - 40);
+      stand(-600, cb + 44, 2500, 260);
+      stand(-600, ct - 16, 650, cb - ct + 32);
+      stand(cr + 70, ct - 16, 650, cb - ct + 32);
+
+      // gramado ao redor da quadra
+      g.fillStyle = '#166534';
+      g.fillRect(cl - 70, ct - 40, cr - cl + 140, cb - ct + 84);
+
+      // placas de publicidade (topo e base)
+      const boardCols = ['#00a859', '#facc15', '#1f4fe0'];
+      const boardTxt = ['TAÇA DAS FAVELAS', 'CAMPINAS', 'CUFA'];
+      g.font = 'bold 13px Outfit, sans-serif';
+      g.textAlign = 'center';
+      [ct - 34, cb + 14].forEach(by => {
+        for (let i = 0, x = cl - 70; x < cr + 70; i++, x += 160) {
+          g.fillStyle = boardCols[i % 3];
+          g.fillRect(x, by, 158, 20);
+          g.fillStyle = (i % 3 === 1) ? '#000' : '#fff';
+          g.fillText(boardTxt[i % 3], x + 79, by + 14);
+        }
+      });
+
+      // refletores nos cantos
+      [[cl - 40, ct - 60], [cr + 40, ct - 60], [cl - 40, cb + 60], [cr + 40, cb + 60]].forEach(([x, y]) => {
+        g.fillStyle = '#94a3b8';
+        g.fillRect(x - 3, y - 6, 6, 40);
+        const glow = g.createRadialGradient(x, y - 10, 2, x, y - 10, 46);
+        glow.addColorStop(0, 'rgba(255, 250, 200, 0.95)');
+        glow.addColorStop(1, 'rgba(255, 250, 200, 0)');
+        g.fillStyle = glow;
+        g.beginPath(); g.arc(x, y - 10, 46, 0, Math.PI * 2); g.fill();
+      });
+      this._stadiumCache = c;
+    }
+    ctx.drawImage(this._stadiumCache, -600, -100);
   }
 
   drawSkyAndSun(ctx) {
@@ -2751,13 +2861,22 @@ class FavelaScenery {
 
     // Piso de Cimento Iluminado pelo Sol de Dia
     const courtGrad = ctx.createLinearGradient(cl, ct, cl, cb);
-    courtGrad.addColorStop(0, '#475569');   // Cimento cinza médio
-    courtGrad.addColorStop(0.5, '#3b4354'); // Textura de concreto firme
-    courtGrad.addColorStop(1, '#2f3543');   // Base de cimento
+    courtGrad.addColorStop(0, VENUES[CURRENT_VENUE].surface[0]);
+    courtGrad.addColorStop(0.5, VENUES[CURRENT_VENUE].surface[1]);
+    courtGrad.addColorStop(1, VENUES[CURRENT_VENUE].surface[2]);
     ctx.fillStyle = courtGrad;
     ctx.fillRect(cl, ct, cw, ch);
 
-    // Manchas de sol e desgaste do asfalto
+    // Faixas de corte do gramado (estádio)
+    if (VENUES[CURRENT_VENUE].stripes) {
+      for (let i = 0; i < 10; i += 2) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.fillRect(cl + i * (cw / 10), ct, cw / 10, ch);
+      }
+    }
+    
+    
+// Manchas de sol e desgaste do asfalto
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.fillRect(cl + 90, ct + 50, 240, 160);
     ctx.fillRect(cl + 520, ct + 80, 260, 220);
@@ -2767,6 +2886,7 @@ class FavelaScenery {
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
+    ctx.strokeStyle = VENUES[CURRENT_VENUE].line;
 
     // Borda da Quadra
     ctx.strokeRect(cl, ct, cw, ch);
@@ -2809,8 +2929,8 @@ class FavelaScenery {
     // Marcações de spray no chão: "BEIÇO STREET"
     ctx.font = '900 24px Outfit';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(250, 204, 21, 0.22)';
-    ctx.fillText('★ BEIÇO STREET ★', midX, midY + 45);
+    ctx.fillStyle = VENUES[CURRENT_VENUE].labelColor;
+    ctx.fillText(VENUES[CURRENT_VENUE].label, midX, midY + 45);
 
     ctx.restore();
   }
@@ -2901,7 +3021,16 @@ class GameCamera {
   }
 
   update(ball, p1, p2, state) {
-    if (state === 'MENU') {
+    if (state === 'PENALTIES') {
+      this.targetX = PEN.spotX + 5;
+      this.targetY = PEN.spotY - 6;
+      this.targetZoom = 1.7;
+    } else if (state === 'CELEBRATION') {
+      const c = window.game && window.game.celebration;
+      this.targetX = c ? c.camX : 672;
+      this.targetY = c ? c.camY : 408;
+      this.targetZoom = (c && c.type === 'trophy') ? 2.1 : 2.4;
+    } else if (state === 'MENU') {
       // Movimento cinematográfico suave no menu
       this.targetX = WORLD.width / 2 + Math.sin(Date.now() * 0.0006) * 90;
       this.targetY = WORLD.height / 2 + Math.cos(Date.now() * 0.0008) * 40;
@@ -2976,7 +3105,22 @@ class GameEngine {
     this.tournamentRound = 0; // 0 = Oitavas, 1 = Quartas, 2 = Semis, 3 = Final
     this.isGoldenGoal = false;
 
-    // Time Selecionado da Taça das Favelas de Campinas
+    // Dificuldade da CPU no modo 1 JOGADOR
+    this.difficulty = 'medium';
+    try {
+      const d = localStorage.getItem('beico_cpu_difficulty');
+      if (d && DIFFICULTIES[d]) this.difficulty = d;
+    } catch (e) {}
+
+    // Campo escolhido (quadra, argemiro, brinco ou auto no torneio)
+    this.venue = 'quadra';
+    try {
+      const v = localStorage.getItem('beico_venue');
+      if (v && (VENUES[v] || v === 'auto')) this.venue = v;
+    } catch (e) {}
+
+    
+// Time Selecionado da Taça das Favelas de Campinas
     this.selectedCampinasTeam = this.loadSelectedCampinasTeam();
     this.tournamentRounds = generateCampinasTournamentRounds(this.selectedCampinasTeam.id);
     TOURNAMENT_ROUNDS = this.tournamentRounds;
@@ -3242,7 +3386,7 @@ class GameEngine {
     this.mouseKick = false;
     window.addEventListener('mousedown', (e) => {
       audio.init();
-      if (e.button === 0 && this.state === 'PLAYING') {
+      if (e.button === 0 && (this.state === 'PLAYING' || this.state === 'PENALTIES')) {
         const target = e.target;
         if (!target.closest('button')) {
           this.mouseKick = true;
@@ -3263,18 +3407,19 @@ class GameEngine {
   }
 
   bindUIButtons() {
+    this.bindTeamSelectUI();
     // 1 Jogador (Amistoso 1v1)
     document.getElementById('btn-1player').addEventListener('click', () => {
       audio.init();
       audio.playClick();
-      this.startMatch('1P');
+      this.openTeamSelect('1P');
     });
 
     // 2 Jogadores (1v1 no mesmo teclado)
     document.getElementById('btn-2players').addEventListener('click', () => {
       audio.init();
       audio.playClick();
-      this.startMatch('2P');
+      this.openTeamSelect('2P');
     });
 
     // Modo Torneio (Copa da Quebrada - 4 Fases Progressivas)
@@ -3343,7 +3488,7 @@ class GameEngine {
         audio.playClick();
         this.tournamentResultModal.classList.add('hidden');
         this.tournamentResultModal.classList.remove('active');
-        this.startTournamentMatch(this.tournamentRound);
+        this.restartTournamentFromStart();
       });
     }
 
@@ -3417,6 +3562,164 @@ class GameEngine {
       audio.playClick();
       this.returnToMenu();
     });
+  }
+
+  // ====================================================================
+  // ESCOLHA DE TIMES (1 JOGADOR x CPU e 2 JOGADORES)
+  // ====================================================================
+  getFriendlyTeams() {
+    const T = CAMPINAS_FAVELA_TEAMS;
+    let t1 = T.find(t => t.id === this.friendlyP1Id) || this.selectedCampinasTeam || T[0];
+    let t2 = T.find(t => t.id === this.friendlyP2Id);
+    if (!t2 || t2.id === t1.id) t2 = T.find(t => t.id !== t1.id);
+    return { t1, t2 };
+  }
+
+  renderVenue() {
+    document.querySelectorAll('.ts-venue-btn').forEach(btn => {
+      const hasAuto = !!btn.parentElement.querySelector('[data-venue="auto"]');
+      const cur = (this.venue === 'auto' && !hasAuto) ? 'quadra' : this.venue;
+      btn.classList.toggle('active', btn.dataset.venue === cur);
+    });
+  }
+
+  applyVenue(roundIndex) {
+    let v = this.venue;
+    if (v === 'auto') v = (roundIndex === undefined) ? 'quadra' : (roundIndex >= 3 ? 'brinco' : 'argemiro');
+    CURRENT_VENUE = VENUES[v] ? v : 'quadra';
+  }
+
+  bindTeamSelectUI() {
+    document.querySelectorAll('.ts-venue-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        this.venue = btn.dataset.venue;
+        try { localStorage.setItem('beico_venue', this.venue); } catch (e) {}
+        this.renderVenue();
+      });
+    });
+    this.renderVenue();
+    const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+    on('btn-team-select-play', () => {
+      audio.init();
+      audio.playClick();
+      this.confirmTeamSelect();
+    });
+    document.querySelectorAll('.ts-diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        audio.init();
+        audio.playClick();
+        this.difficulty = btn.dataset.diff;
+        try { localStorage.setItem('beico_cpu_difficulty', this.difficulty); } catch (e) {}
+        this.renderDifficulty();
+      });
+    });
+    const back = () => { audio.playClick(); this.closeTeamSelect(true); };
+    on('btn-team-select-back', back);
+    on('btn-close-team-select', back);
+  }
+
+  renderDifficulty() {
+    const box = document.getElementById('ts-difficulty');
+    if (box) box.classList.toggle('hidden', this.pickMode !== '1P');
+    document.querySelectorAll('.ts-diff-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === this.difficulty);
+    });
+  }
+
+  openTeamSelect(mode) {
+    const T = CAMPINAS_FAVELA_TEAMS;
+    this.pickMode = mode;
+
+    // Recupera as últimas escolhas salvas
+    try {
+      if (!this.friendlyP1Id) this.friendlyP1Id = localStorage.getItem('beico_friendly_p1') || '';
+      if (!this.friendlyP2Id) this.friendlyP2Id = localStorage.getItem('beico_friendly_p2') || '';
+    } catch (e) {}
+    if (!T.find(t => t.id === this.friendlyP1Id)) this.friendlyP1Id = (this.selectedCampinasTeam || T[0]).id;
+    if (!T.find(t => t.id === this.friendlyP2Id) || this.friendlyP2Id === this.friendlyP1Id) {
+      this.friendlyP2Id = T.find(t => t.id !== this.friendlyP1Id).id;
+    }
+
+    document.getElementById('ts-p1-title').textContent = mode === '2P' ? 'JOGADOR 1 • WASD + ESPAÇO' : 'VOCÊ • WASD/SETAS + ESPAÇO';
+    document.getElementById('ts-p2-title').textContent = mode === '2P' ? 'JOGADOR 2 • SETAS + ENTER' : 'ADVERSÁRIO • CPU';
+    document.getElementById('ts-subtitle').textContent = mode === '2P'
+      ? 'Cada jogador escolhe o time da sua quebrada. Não pode repetir o time!'
+      : 'Escolha o seu time e quem você quer enfrentar na quadra.';
+
+    this.mainMenu.classList.remove('active');
+    this.mainMenu.classList.add('hidden');
+    const modal = document.getElementById('team-select-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    this.renderTeamSelect();
+    this.renderDifficulty();
+  }
+
+  renderTeamSelect() {
+    const T = CAMPINAS_FAVELA_TEAMS;
+    ['p1', 'p2'].forEach(side => {
+      const grid = document.getElementById(`ts-${side}-grid`);
+      const box = document.getElementById(`ts-${side}-selected`);
+      if (!grid || !box) return;
+      const keepScroll = grid.scrollTop;
+      const ownId = side === 'p1' ? this.friendlyP1Id : this.friendlyP2Id;
+      const otherId = side === 'p1' ? this.friendlyP2Id : this.friendlyP1Id;
+
+      grid.innerHTML = '';
+      T.forEach(team => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        const isOwn = team.id === ownId;
+        const isTaken = team.id === otherId;
+        card.className = `ts-card ${isOwn ? 'selected-' + side : ''} ${isTaken ? 'taken' : ''}`;
+        card.title = isTaken ? 'Já escolhido pelo outro lado' : team.name;
+        card.innerHTML = `
+          ${isOwn ? `<div class="ts-card-tag">${side === 'p1' ? 'P1' : (this.pickMode === '2P' ? 'P2' : 'CPU')}</div>` : ''}
+          <div class="ts-card-avatar" style="background:${team.shirtColor}; border-color:${team.shortsColor};">${team.avatar}</div>
+          <div class="ts-card-name">${team.name}</div>
+          <div class="ts-card-kit"><span style="background:${team.shirtColor}"></span><span style="background:${team.shortsColor}"></span></div>
+        `;
+        card.addEventListener('click', () => {
+          if (isTaken) return;
+          if (side === 'p1') this.friendlyP1Id = team.id; else this.friendlyP2Id = team.id;
+          audio.playClick();
+          this.renderTeamSelect();
+        });
+        grid.appendChild(card);
+      });
+      grid.scrollTop = keepScroll;
+
+      const sel = T.find(t => t.id === ownId);
+      box.innerHTML = `
+        <div class="ts-selected-avatar" style="background:${sel.shirtColor}; border-color:${sel.shortsColor};">${sel.avatar}</div>
+        <div>
+          <div class="ts-selected-name">${sel.name.toUpperCase()}</div>
+          <div class="ts-selected-meta">${sel.starPlayer} • VEL ${sel.stats.vel} • CHU ${sel.stats.chute} • RAÇA ${sel.stats.raca}</div>
+        </div>`;
+    });
+  }
+
+  confirmTeamSelect() {
+    try {
+      localStorage.setItem('beico_friendly_p1', this.friendlyP1Id);
+      localStorage.setItem('beico_friendly_p2', this.friendlyP2Id);
+    } catch (e) {}
+    this.closeTeamSelect(false);
+    this.startMatch(this.pickMode || '1P');
+  }
+
+  closeTeamSelect(showMenu) {
+    const modal = document.getElementById('team-select-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.classList.add('hidden');
+    }
+    if (showMenu) {
+      this.mainMenu.classList.remove('hidden');
+      this.mainMenu.classList.add('active');
+    }
   }
 
   // ====================================================================
@@ -3516,9 +3819,12 @@ class GameEngine {
   }
 
   startTournamentMatch(roundIndex = 0) {
+    this.kickoffTeam = null;
     this.isTournament = true;
     const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
     this.tournamentRound = Math.min(Math.max(0, roundIndex), rounds.length - 1);
+    this.applyVenue(this.tournamentRound);
+    this.cleanupPenaltyUI();
     this.isGoldenGoal = false;
     this.gameMode = 'TOURNAMENT';
 
@@ -3530,9 +3836,9 @@ class GameEngine {
     p1.isControlled = true;
     p1.controlId = 1;
     this.applyPlayerTeamAppearance(p1, myTeam);
-    p1.speed = 3.0;
-    p1.kickPowerMax = 14.5;
-    p1.kickPowerMin = 5.5;
+    p1.speed = 1.9;
+    p1.kickPowerMax = 9.0;
+    p1.kickPowerMin = 3.8;
 
     // Configuração do Adversário (Time de Campinas da Fase Atual)
     const opp = roundData.opponent;
@@ -3551,6 +3857,7 @@ class GameEngine {
     p2.aiLeadFrames = opp.aiLeadFrames;
     p2.aiAttackDist = opp.aiAttackDist;
     p2.kickPowerDefault = opp.kickPowerDefault;
+    p2.aiReactionFrames = [14, 10, 7, 5][this.tournamentRound] || 10;
 
     // Atualização dos nomes e ícones no HUD do placar
     if (this.p1ScoreName) this.p1ScoreName.textContent = myTeam.shortName || myTeam.name;
@@ -3600,6 +3907,9 @@ class GameEngine {
   }
 
   startMatch(mode = '1P') {
+    this.applyVenue();
+    this.cleanupPenaltyUI();
+    this.kickoffTeam = null;
     this.isTournament = false;
     this.isGoldenGoal = false;
     this.gameMode = mode;
@@ -3613,10 +3923,15 @@ class GameEngine {
       this.tournamentStageBadge.classList.add('hidden');
     }
 
-    // Resetar HUD do adversário para o padrão
-    if (this.rivalScoreName) this.rivalScoreName.textContent = 'RIVAIS';
-    if (this.rivalScoreSub) this.rivalScoreSub.textContent = 'DO OUTRO LADO';
-    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = '🔥';
+    // Times escolhidos na tela de seleção
+    const teams = this.getFriendlyTeams();
+    const diff0 = DIFFICULTIES[this.difficulty] || DIFFICULTIES.medium;
+    if (this.p1ScoreName) this.p1ScoreName.textContent = teams.t1.shortName;
+    if (this.p1ScoreSub) this.p1ScoreSub.textContent = mode === '2P' ? 'JOGADOR 1' : 'VOCÊ';
+    if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = teams.t1.avatar;
+    if (this.rivalScoreName) this.rivalScoreName.textContent = teams.t2.shortName;
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = mode === '2P' ? 'JOGADOR 2' : ('CPU • ' + diff0.label);
+    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = teams.t2.avatar;
 
     // Atualizar jogadores
     const p1 = this.players[0]; // Beiço
@@ -3624,22 +3939,19 @@ class GameEngine {
 
     p1.isControlled = true;
     p1.controlId = 1;
-    p1.speed = 3.0;
-    p1.kickPowerMax = 14.5;
-    p1.kickPowerMin = 5.5;
+    p1.speed = 1.9;
+    p1.kickPowerMax = 9.0;
+    p1.kickPowerMin = 3.8;
 
-    p2.name = 'Caveira #9';
-    p2.skinTone = '#a16207';
-    p2.shirtColor = '#ef4444';
-    p2.shortsColor = '#4338ca';
-    p2.hairStyle = 'buzz';
-    p2.hairColor = '#1c1917';
-    p2.number = '9';
-    p2.speed = 3.0;
-    p2.kickPowerMax = 14.5;
-    p2.aiLeadFrames = 8;
-    p2.aiAttackDist = 260;
-    p2.kickPowerDefault = 0.85;
+    this.applyPlayerTeamAppearance(p1, teams.t1);
+    this.applyPlayerTeamAppearance(p2, teams.t2);
+    const diff = (mode === '1P') ? (DIFFICULTIES[this.difficulty] || DIFFICULTIES.medium) : DIFFICULTIES.medium;
+    p2.speed = diff.speed;
+    p2.kickPowerMax = diff.kickPowerMax;
+    p2.aiLeadFrames = diff.aiLeadFrames;
+    p2.aiAttackDist = diff.aiAttackDist;
+    p2.kickPowerDefault = diff.kickPowerDefault;
+    p2.aiReactionFrames = diff.aiReactionFrames;
 
     if (mode === '2P') {
       p2.isControlled = true;
@@ -3705,32 +4017,40 @@ class GameEngine {
   startTimerInterval() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {
-      if (this.state === 'PLAYING') {
-        // Se estiver no Gol de Ouro (morte súbita), o tempo é INFINITO e o cronômetro não decresce
-        if (!this.isGoldenGoal) {
-          this.timer--;
-          this.updateTimerDisplay();
+      if (this.state !== 'PLAYING') return;
 
-          if (this.timer <= 0) {
-            // Se empatar quando o tempo regulamentar acabar, ENTRA NO GOL DE OURO COM TEMPO INFINITO!
-            if (this.scoreBeico === this.scoreRivais) {
-              this.triggerGoldenGoal();
-              return;
-            }
-            this.endMatch();
-          }
+      // Gol de Ouro: 20 segundos. Se ninguém marcar, vai para os pênaltis
+      if (this.isGoldenGoal) {
+        this.goldenTimer--;
+        this.updateTimerDisplay();
+        if (this.goldenTimer <= 0) {
+          this.startPenaltyShootout();
         }
+        return;
+      }
+
+      this.timer--;
+      this.updateTimerDisplay();
+
+      if (this.timer <= 0) {
+        // Empatou no tempo normal: entra o Gol de Ouro (20 segundos)
+        if (this.scoreBeico === this.scoreRivais) {
+          this.triggerGoldenGoal();
+          return;
+        }
+        this.endMatch();
       }
     }, 1000);
   }
 
   triggerGoldenGoal() {
     this.isGoldenGoal = true;
+    this.goldenTimer = GOLDEN_GOAL_SECONDS;
     this.updateTimerDisplay();
     audio.playWhistle(true);
     this.triggerShake(12);
 
-    // Exibir o banner de Gol de Ouro com tempo infinito
+    // Banner do Gol de Ouro (20 segundos)
     if (this.goldenGoalBanner) {
       this.goldenGoalBanner.classList.remove('hidden');
       setTimeout(() => {
@@ -3743,12 +4063,22 @@ class GameEngine {
     for (const player of this.players) {
       player.reset();
     }
-    this.ball.reset(WORLD.width / 2, (WORLD.courtTop + WORLD.courtBottom) / 2);
+    // Saida de bola: quem tomou o gol recomeca com a bola; no inicio da partida fica no centro
+    let bx = WORLD.width / 2;
+    const by = (WORLD.courtTop + WORLD.courtBottom) / 2;
+    const starter = this.kickoffTeam ? this.players.find(p => p.team === this.kickoffTeam) : null;
+    if (starter) {
+      bx = starter.homeX + (starter.team === 'beico' ? 60 : -60);
+    }
+    this.ballStartX = bx;
+    this.ballStartY = by;
+    this.ball.reset(bx, by);
   }
 
   updateTimerDisplay() {
     if (this.isGoldenGoal) {
-      this.timerEl.textContent = 'GOL DE OURO ∞';
+      const gs = Math.max(0, this.goldenTimer);
+      this.timerEl.textContent = `⚡ OURO 00:${gs.toString().padStart(2, '0')}`;
       this.timerEl.classList.add('hurry-up', 'golden-goal-timer');
       return;
     }
@@ -3780,6 +4110,8 @@ class GameEngine {
     const myTeam = (this.isTournament && this.selectedCampinasTeam) ? this.selectedCampinasTeam : null;
     const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
     const oppTeam = (this.isTournament && rounds[this.tournamentRound]) ? rounds[this.tournamentRound].opponent : null;
+
+    this.kickoffTeam = (scoringTeam === 'beico') ? 'rivais' : 'beico';
 
     if (scoringTeam === 'beico') {
       this.scoreBeico++;
@@ -3837,9 +4169,9 @@ class GameEngine {
 
     audio.playWhistle(true);
 
-    // Se estiver no Modo Torneio, apresenta o resultado com chaveamento da Taça das Favela
+    // Modo Torneio: animação de comemoração / tristeza antes do resultado
     if (this.isTournament) {
-      this.showTournamentResult();
+      this.startCelebration();
       return;
     }
 
@@ -3847,27 +4179,50 @@ class GameEngine {
     const titleEl = document.getElementById('game-over-title');
     const subEl = document.getElementById('game-over-subtitle');
 
-    document.getElementById('final-score-beico').textContent = this.scoreBeico;
-    document.getElementById('final-score-rivais').textContent = this.scoreRivais;
+    const ft = this.getFriendlyTeams();
+    const pr = this.penResult;
+    const winner = this.getWinner();
+    document.getElementById('final-score-beico').textContent = this.scoreText('beico');
+    document.getElementById('final-score-rivais').textContent = this.scoreText('rivais');
+    const fn1 = document.getElementById('final-name-p1');
+    const fn2 = document.getElementById('final-name-p2');
+    if (fn1) fn1.textContent = ft.t1.shortName;
+    if (fn2) fn2.textContent = ft.t2.shortName;
 
-    if (this.scoreBeico > this.scoreRivais) {
-      titleEl.textContent = 'É O BEIÇO!';
-      titleEl.style.color = '#facc15';
-      subEl.textContent = this.isGoldenGoal 
-        ? 'Vitória heroica no Gol de Ouro com tempo infinito! Respeita!' 
-        : 'A Taça das Favela fica em casa! Respeita os cria!';
+    if (winner === 'beico') {
+      titleEl.textContent = `É O ${ft.t1.shortName}!`;
+      titleEl.style.color = '#ffd400';
+      subEl.textContent = pr
+        ? `Vitória nos pênaltis (${pr.beico} × ${pr.rivais})! Sangue frio de cria!`
+        : (this.isGoldenGoal
+          ? 'Vitória heroica no Gol de Ouro! Respeita!'
+          : 'A Taça das Favelas fica na quebrada! Respeita os cria!');
       this.particles.triggerGoalConfetti();
       audio.playCheer();
-    } else if (this.scoreRivais > this.scoreBeico) {
-      titleEl.textContent = 'HOJE NÃO DEU...';
-      titleEl.style.color = '#ef4444';
-      subEl.textContent = this.isGoldenGoal 
-        ? 'Derrota dolorida na morte súbita do Gol de Ouro! Amanhã tem revanche!' 
-        : 'Os rivais levaram essa. Mas amanhã tem revanche na quadra!';
+    } else if (winner === 'rivais') {
+      if (this.gameMode === '2P') {
+        titleEl.textContent = `É O ${ft.t2.shortName}!`;
+        titleEl.style.color = '#5b8dff';
+        subEl.textContent = pr
+          ? `Vitória nos pênaltis (${pr.rivais} × ${pr.beico})! Respeita o Jogador 2!`
+          : (this.isGoldenGoal
+            ? 'Gol de Ouro! Respeita o Jogador 2!'
+            : 'O Jogador 2 levou a melhor na quadra!');
+        this.particles.triggerGoalConfetti();
+        audio.playCheer();
+      } else {
+        titleEl.textContent = 'HOJE NÃO DEU...';
+        titleEl.style.color = '#5b8dff';
+        subEl.textContent = pr
+          ? `Perdeu nos pênaltis (${pr.beico} × ${pr.rivais}). Amanhã tem revanche!`
+          : (this.isGoldenGoal
+            ? 'Derrota dolorida no Gol de Ouro! Amanhã tem revanche!'
+            : `${ft.t2.name} levou essa. Mas amanhã tem revanche na quadra!`);
+      }
     } else {
-      titleEl.textContent = 'GOL DE OURO!';
+      titleEl.textContent = 'EMPATE!';
       titleEl.style.color = '#38bdf8';
-      subEl.textContent = 'Empatou! Quem fizer o gol leva tudo!';
+      subEl.textContent = 'Jogo empatado.';
     }
 
     this.gameOverScreen.classList.remove('hidden');
@@ -3894,28 +4249,32 @@ class GameEngine {
     const btnNextText = document.getElementById('btn-tourney-next-text');
     const btnRetry = document.getElementById('btn-tourney-retry');
 
-    if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreBeico;
-    if (scoreRivalEl) scoreRivalEl.textContent = this.scoreRivais;
+    if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreText('beico');
+    if (scoreRivalEl) scoreRivalEl.textContent = this.scoreText('rivais');
     if (p1NameEl) p1NameEl.textContent = myTeam.shortName || myTeam.name;
     if (rivalNameEl) rivalNameEl.textContent = roundData.opponent.shortName || roundData.opponent.name;
 
     badgeEl.classList.remove('badge-eliminated', 'badge-champion');
 
-    const playerWon = this.scoreBeico > this.scoreRivais;
+    const playerWon = this.getWinner() === 'beico';
+    const pr = this.penResult;
+    const how = pr ? 'pen' : (this.isGoldenGoal ? 'gold' : 'normal');
+    const penTxt = pr ? `${pr.beico} × ${pr.rivais}` : '';
+    const oppShort = roundData.opponent.shortName;
+    const oppFull = roundData.opponent.teamFullName || oppShort;
 
     if (playerWon) {
-      this.particles.triggerGoalConfetti();
-      audio.playCheer();
-
       if (curRound === 3) {
         // CAMPEÃO DA GRANDE FINAL!
         badgeEl.classList.add('badge-champion');
         badgeEl.textContent = 'CAMPEÃO DA TAÇA DAS FAVELAS DE CAMPINAS! 👑';
         iconEl.textContent = '🏆';
         titleEl.textContent = `É CAMPEÃO! ${myTeam.name.toUpperCase()} LEVANTA A TAÇA!`;
-        descEl.textContent = this.isGoldenGoal
-          ? `GOL DE OURO NA GRANDE FINAL! O ${myTeam.name} derrubou o ${roundData.opponent.teamFullName || roundData.opponent.shortName} no tempo infinito e levantou a cobiçada Taça das Favelas de Campinas! A comunidade inteira está em festa!`
-          : `O ${myTeam.name} deu aula na Grande Final contra o ${roundData.opponent.teamFullName || roundData.opponent.shortName} e conquistou a histórica Taça das Favelas de Campinas! O troféu é da quebrada!`;
+        descEl.textContent = {
+          pen: `NOS PÊNALTIS (${penTxt})! O ${myTeam.name} manteve a frieza na Grande Final contra o ${oppFull} e levantou a cobiçada Taça das Favelas de Campinas! A comunidade inteira está em festa!`,
+          gold: `GOL DE OURO NA GRANDE FINAL! O ${myTeam.name} derrubou o ${oppFull} e levantou a cobiçada Taça das Favelas de Campinas! A comunidade inteira está em festa!`,
+          normal: `O ${myTeam.name} deu aula na Grande Final contra o ${oppFull} e conquistou a histórica Taça das Favelas de Campinas! O troféu é da quebrada!`
+        }[how];
 
         btnNext.classList.remove('hidden');
         if (btnNextText) btnNextText.textContent = 'NOVO TORNEIO 🏆';
@@ -3926,26 +4285,36 @@ class GameEngine {
         badgeEl.textContent = 'CLASSIFICADO!';
         iconEl.textContent = '⭐';
         titleEl.textContent = `${myTeam.shortName.toUpperCase()} AVANÇOU PARA AS ${nextRound.name.toUpperCase()}!`;
-        descEl.textContent = this.isGoldenGoal
-          ? `GOL DE OURO SALVADOR! O ${myTeam.name} eliminou o ${roundData.opponent.shortName} na morte súbita da Taça das Favelas de Campinas! Prepare-se: o próximo desafio é contra ${nextRound.opponent.shortName}!`
-          : `Vitória maiúscula! O ${myTeam.name} superou o ${roundData.opponent.shortName} na Taça das Favelas de Campinas. Na próxima fase o duelo é contra o ${nextRound.opponent.shortName}!`;
+        descEl.textContent = {
+          pen: `NOS PÊNALTIS (${penTxt})! O ${myTeam.name} eliminou o ${oppShort} na emoção da Taça das Favelas de Campinas! Prepare-se: o próximo desafio é contra ${nextRound.opponent.shortName}!`,
+          gold: `GOL DE OURO SALVADOR! O ${myTeam.name} eliminou o ${oppShort} na Taça das Favelas de Campinas! Prepare-se: o próximo desafio é contra ${nextRound.opponent.shortName}!`,
+          normal: `Vitória maiúscula! O ${myTeam.name} superou o ${oppShort} na Taça das Favelas de Campinas. Na próxima fase o duelo é contra o ${nextRound.opponent.shortName}!`
+        }[how];
 
         btnNext.classList.remove('hidden');
         if (btnNextText) btnNextText.textContent = `PRÓXIMA FASE (${nextRound.name.toUpperCase()}) ➔`;
         btnRetry.classList.add('hidden');
       }
     } else {
-      // ELIMINADO DO TORNEIO
+      // ELIMINADO DO TORNEIO: a Taça recomeça do zero
       badgeEl.classList.add('badge-eliminated');
       badgeEl.textContent = 'ELIMINADO DA TAÇA DAS FAVELAS DE CAMPINAS';
-      iconEl.textContent = '💀';
+      iconEl.textContent = '😢';
       titleEl.textContent = `FIM DA LINHA PARA O ${myTeam.shortName.toUpperCase()}!`;
-      descEl.textContent = this.isGoldenGoal
-        ? `O ${roundData.opponent.shortName} cravou o Gol de Ouro no tempo infinito. Na Taça das Favelas de Campinas só os fortes sobrevivem: treine e volte para buscar a taça!`
-        : `O ${roundData.opponent.shortName} levou a melhor nesta rodada. Mas a quebrada do ${myTeam.name} nunca desiste: treine e tente novamente!`;
+      descEl.textContent = {
+        pen: `O ${oppShort} levou a melhor nos pênaltis (${penTxt}). `,
+        gold: `O ${oppShort} cravou o Gol de Ouro. `,
+        normal: `O ${oppShort} levou a melhor nesta rodada. `
+      }[how] + 'Perdeu, voltou pro começo: a Taça recomeça do zero, desde as Oitavas de Final!';
 
       btnNext.classList.add('hidden');
       btnRetry.classList.remove('hidden');
+      btnRetry.innerHTML = '<span>🔄</span> RECOMEÇAR DO INÍCIO';
+
+      // Volta para a fase 1 com um novo chaveamento
+      this.tournamentRound = 0;
+      this.tournamentRounds = generateCampinasTournamentRounds(myTeam.id);
+      TOURNAMENT_ROUNDS = this.tournamentRounds;
     }
 
     this.tournamentResultModal.classList.remove('hidden');
@@ -3953,6 +4322,9 @@ class GameEngine {
   }
 
   returnToMenu() {
+    CURRENT_VENUE = 'quadra';
+    this.cleanupPenaltyUI();
+    this.kickoffTeam = null;
     this.state = 'MENU';
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.isTournament = false;
@@ -3996,6 +4368,636 @@ class GameEngine {
     this.resetPositions();
   }
 
+  // ====================================================================
+  // RESULTADO / REINÍCIO DO TORNEIO
+  // ====================================================================
+  getWinner() {
+    if (this.scoreBeico > this.scoreRivais) return 'beico';
+    if (this.scoreRivais > this.scoreBeico) return 'rivais';
+    if (this.penResult) return this.penResult.winner;
+    return 'draw';
+  }
+
+  scoreText(team) {
+    const base = team === 'beico' ? this.scoreBeico : this.scoreRivais;
+    return this.penResult ? `${base} (${this.penResult[team]})` : `${base}`;
+  }
+
+  // Perdeu: a Taça recomeça do zero (Oitavas), com novo chaveamento
+  restartTournamentFromStart() {
+    const myTeam = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
+    this.tournamentRound = 0;
+    this.tournamentRounds = generateCampinasTournamentRounds(myTeam.id);
+    TOURNAMENT_ROUNDS = this.tournamentRounds;
+    this.returnToMenu();
+    this.openTournamentModal();
+  }
+
+  cleanupPenaltyUI() {
+    this.pen = null;
+    this.penResult = null;
+    this.celebration = null;
+    document.body.classList.remove('penalties');
+    const h = document.getElementById('penalty-hud');
+    if (h) h.classList.add('hidden');
+    this.hidePenBanner();
+    const cb = document.getElementById('celebration-banner');
+    if (cb) cb.classList.add('hidden');
+    for (const p of this.players) { p.pose = null; p.poseT = 0; p.poseTilt = 0; }
+  }
+
+  // ====================================================================
+  // CELEBRAÇÃO DO TORNEIO (tristeza, alegria e taça levantada)
+  // ====================================================================
+  startCelebration() {
+    const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
+    const myTeam = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
+    const won = this.getWinner() === 'beico';
+    const champion = won && this.tournamentRound === 3;
+    const type = champion ? 'trophy' : (won ? 'happy' : 'sad');
+    const p1 = this.players[0];
+    const p2 = this.players[1];
+
+    for (const p of this.players) {
+      p.vx = 0; p.vy = 0; p.walkCycle = 0; p.kickAnimTimer = 0;
+      p.isChargingKick = false; p.kickCharge = 0; p.poseT = 0; p.poseTilt = 0;
+      p.facingAngle = Math.PI / 2;
+    }
+    p1.x = champion ? 650 : 625; p1.y = 440;
+    p2.x = champion ? 775 : 735; p2.y = 448;
+    p1.pose = champion ? 'trophy' : (won ? 'happy' : 'sad');
+    p2.pose = won ? 'sad' : 'happy';
+    this.ball.reset(575, 478);
+    this.mouseKick = false;
+    this.particles.clear();
+
+    this.celebration = {
+      type, t: 0,
+      duration: champion ? 360 : (won ? 210 : 240),
+      camX: champion ? 708 : 680, camY: 402
+    };
+    this.state = 'CELEBRATION';
+
+    // Limpa a tela para a cena
+    this.hudElement.classList.add('hidden');
+    if (this.goldenGoalBanner) this.goldenGoalBanner.classList.add('hidden');
+    this.goalBanner.classList.add('hidden');
+    this.countdownBanner.classList.add('hidden');
+
+    let text, sub;
+    if (champion) {
+      text = '🏆 É CAMPEÃO!!!';
+      sub = `${myTeam.name.toUpperCase()} LEVANTA A TAÇA DAS FAVELAS!`;
+      audio.playGoal(); audio.playCheer();
+      this.particles.triggerGoalConfetti();
+    } else if (won) {
+      const next = rounds[this.tournamentRound + 1];
+      text = '🎉 CLASSIFICADO!';
+      sub = `${(myTeam.shortName || myTeam.name).toUpperCase()} AVANÇOU PARA AS ${next ? next.name.toUpperCase() : 'PRÓXIMA FASE'}!`;
+      audio.playCheer();
+      this.particles.triggerGoalConfetti();
+    } else {
+      text = '😢 ELIMINADO...';
+      sub = 'A TAÇA RECOMEÇA DO ZERO!';
+      audio.playSad();
+    }
+
+    const cb = document.getElementById('celebration-banner');
+    if (cb) {
+      document.getElementById('celebration-text').textContent = text;
+      document.getElementById('celebration-sub').textContent = sub;
+      cb.className = 'celebration-banner hidden';
+      void cb.offsetWidth;
+      cb.className = 'celebration-banner ' + type;
+    }
+  }
+
+  updateCelebration() {
+    const c = this.celebration;
+    if (!c) return;
+    c.t++;
+    for (const p of this.players) p.poseT = (p.poseT || 0) + 1;
+
+    if (c.type === 'happy' && c.t % 70 === 0) this.particles.triggerGoalConfetti();
+    if (c.type === 'trophy') {
+      if (c.t % 24 === 0) {
+        this.particles.addFirework(500 + Math.random() * 420, 240 + Math.random() * 170);
+        audio.playSnap(0.7);
+      }
+      if (c.t % 100 === 0) this.particles.triggerGoalConfetti();
+      if (c.t % 10 === 0) {
+        const p = this.players[0];
+        this.particles.addSparks(p.x + (Math.random() - 0.5) * 30, p.y - 76, 0, 0, 3);
+      }
+    }
+
+    if (c.t >= c.duration) {
+      this.state = 'GAMEOVER';
+      this.celebration = null;
+      for (const p of this.players) { p.pose = null; p.poseT = 0; p.poseTilt = 0; }
+      const cb = document.getElementById('celebration-banner');
+      if (cb) cb.classList.add('hidden');
+      this.showTournamentResult();
+    }
+  }
+
+  drawCelebrationRays(ctx) {
+    const c = this.celebration;
+    const p = this.players[0];
+    const cx = p.x;
+    const cy = p.y - 70;
+    ctx.save();
+    const glow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 320);
+    glow.addColorStop(0, 'rgba(255, 224, 102, 0.55)');
+    glow.addColorStop(1, 'rgba(255, 224, 102, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, 320, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(cx, cy);
+    ctx.rotate(c.t * 0.006);
+    const n = 14;
+    for (let i = 0; i < n; i++) {
+      ctx.rotate((Math.PI * 2) / n);
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(-26, -560); ctx.lineTo(26, -560);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 224, 102, 0.16)';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawCelebrationOverlay(ctx, w, h) {
+    const c = this.celebration;
+    if (!c) return;
+    const k = Math.min(1, c.t / 30);
+    ctx.save();
+    if (c.type === 'sad') {
+      ctx.fillStyle = `rgba(15, 23, 42, ${0.45 * k})`;
+      ctx.fillRect(0, 0, w, h);
+      const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.75);
+      vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vg.addColorStop(1, `rgba(0, 0, 0, ${0.6 * k})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, w, h);
+      // chuva
+      ctx.strokeStyle = 'rgba(147, 197, 253, 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 160; i++) {
+        const x = (i * 137.5) % w;
+        const y = ((i * 71 + c.t * (16 + (i % 5) * 3)) % (h + 60)) - 30;
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 5, y + 18);
+      }
+      ctx.stroke();
+    } else {
+      const strong = c.type === 'trophy' ? 0.28 : 0.18;
+      const g = ctx.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, Math.max(w, h) * 0.7);
+      g.addColorStop(0, `rgba(255, 212, 0, ${strong * k})`);
+      g.addColorStop(1, 'rgba(255, 212, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      if (c.type === 'trophy' && c.t < 20) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${(1 - c.t / 20) * 0.6})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+    }
+    ctx.restore();
+  }
+
+  // ====================================================================
+  // DISPUTA DE PÊNALTIS
+  // ====================================================================
+  penPlayer(team) {
+    return team === 'beico' ? this.players[0] : this.players[1];
+  }
+
+  penTeamName(team) {
+    const el = team === 'beico' ? this.p1ScoreName : this.rivalScoreName;
+    return el ? el.textContent : (team === 'beico' ? 'TIME 1' : 'TIME 2');
+  }
+
+  penReadInput(ctrl) {
+    const k = this.keys;
+    const single = (this.gameMode !== '2P');
+    if (ctrl === 1) {
+      return {
+        up: !!(k['KeyW'] || k['w'] || k['W'] || (single && (k['ArrowUp'] || k['arrowup']))),
+        down: !!(k['KeyS'] || k['s'] || k['S'] || (single && (k['ArrowDown'] || k['arrowdown']))),
+        shoot: !!(k['Space'] || k[' '] || this.mouseKick || (single && (k['Enter'] || k['KeyX'] || k['x'])))
+      };
+    }
+    return {
+      up: !!(k['ArrowUp'] || k['arrowup']),
+      down: !!(k['ArrowDown'] || k['arrowdown']),
+      shoot: !!(k['Enter'] || k['Numpad0'])
+    };
+  }
+
+  // Dificuldade da CPU nos pênaltis: chance de acertar o canto (goleiro) e de errar o gol (batedor)
+  penDifficulty() {
+    if (this.isTournament) {
+      const r = Math.min(3, Math.max(0, this.tournamentRound));
+      return { guess: [0.26, 0.34, 0.42, 0.52][r], miss: [0.26, 0.17, 0.10, 0.05][r] };
+    }
+    const d = { easy: [0.22, 0.28], medium: [0.34, 0.16], hard: [0.44, 0.10], legend: [0.56, 0.05] }[this.difficulty] || [0.34, 0.16];
+    return { guess: d[0], miss: d[1] };
+  }
+
+  penCpuPickTarget() {
+    const r = Math.random();
+    const zone = r < 0.38 ? 'up' : (r < 0.76 ? 'down' : 'mid');
+    let y;
+    if (zone === 'up') y = WORLD.goalYTop + 14 + Math.random() * 16;
+    else if (zone === 'down') y = WORLD.goalYBottom - 14 - Math.random() * 16;
+    else y = PEN.spotY + (Math.random() - 0.5) * 24;
+    if (Math.random() < this.penDifficulty().miss) {
+      y = Math.random() < 0.5
+        ? WORLD.goalYTop - 12 - Math.random() * 20
+        : WORLD.goalYBottom + 12 + Math.random() * 20;
+    }
+    return y;
+  }
+
+  penCpuKeeperZone(shotY) {
+    const z = PEN.zones;
+    const correct = shotY < (z.up + z.mid) / 2 ? 'up' : (shotY > (z.mid + z.down) / 2 ? 'down' : 'mid');
+    if (Math.random() < this.penDifficulty().guess) return correct;
+    return ['up', 'mid', 'down'][Math.floor(Math.random() * 3)];
+  }
+
+  showPenBanner(text, sub, kind, frames) {
+    const el = document.getElementById('pen-banner');
+    if (!el) return;
+    document.getElementById('pen-banner-text').textContent = text;
+    const subEl = document.getElementById('pen-banner-sub');
+    subEl.textContent = sub || '';
+    subEl.style.display = sub ? '' : 'none';
+    el.dataset.kind = kind || 'info';
+    el.classList.add('hidden');
+    void el.offsetWidth;
+    el.classList.remove('hidden');
+    if (this.pen) this.pen.bannerFrames = frames;
+  }
+
+  hidePenBanner() {
+    const el = document.getElementById('pen-banner');
+    if (el) el.classList.add('hidden');
+  }
+
+  startPenaltyShootout() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.state = 'PENALTIES';
+    this.isGoldenGoal = false;
+    this.penResult = null;
+    this.mouseKick = false;
+    this.pen = {
+      kicks: { beico: [], rivais: [] },
+      scores: { beico: 0, rivais: 0 },
+      idx: 0, phase: 'READY', t: 0,
+      shooter: 'beico', keeper: 'rivais',
+      aimY: PEN.spotY, shotY: PEN.spotY, zone: null, result: null,
+      bannerFrames: 0, winner: null, lockShown: false,
+      pk: { up: false, down: false, shoot: false }, ps: false,
+      cpuDelay: 90, cpuTarget: PEN.spotY
+    };
+
+    this.timerEl.textContent = 'PÊNALTIS';
+    this.timerEl.classList.remove('hurry-up');
+    this.timerEl.classList.add('golden-goal-timer');
+    if (this.goldenGoalBanner) this.goldenGoalBanner.classList.add('hidden');
+    this.goalBanner.classList.add('hidden');
+    document.body.classList.add('penalties');
+    document.getElementById('penalty-hud').classList.remove('hidden');
+    document.getElementById('pen-name-p1').textContent = this.penTeamName('beico');
+    document.getElementById('pen-name-p2').textContent = this.penTeamName('rivais');
+
+    audio.playWhistle(true);
+    this.triggerShake(8);
+    this.penBeginKick();
+    this.showPenBanner('DISPUTA DE PÊNALTIS', 'MELHOR DE 5 • EMPATOU? MORTE SÚBITA!', 'info', 130);
+  }
+
+  penBeginKick() {
+    const pen = this.pen;
+    pen.shooter = (pen.idx % 2 === 0) ? 'beico' : 'rivais';
+    pen.keeper = pen.shooter === 'beico' ? 'rivais' : 'beico';
+    pen.phase = 'READY';
+    pen.t = 0;
+    pen.aimY = PEN.spotY;
+    pen.shotY = PEN.spotY;
+    pen.zone = null;
+    pen.result = null;
+    pen.lockShown = false;
+
+    const single = (this.gameMode !== '2P');
+    pen.shooterHuman = single ? pen.shooter === 'beico' : true;
+    pen.keeperHuman = single ? pen.keeper === 'beico' : true;
+    pen.shooterCtrl = single ? 1 : (pen.shooter === 'beico' ? 1 : 2);
+    pen.keeperCtrl = single ? 1 : (pen.shooter === 'beico' ? 2 : 1);
+
+    const sp = this.penPlayer(pen.shooter);
+    const kp = this.penPlayer(pen.keeper);
+    for (const p of [sp, kp]) {
+      p.vx = 0; p.vy = 0; p.walkCycle = 0; p.kickAnimTimer = 0;
+      p.isChargingKick = false; p.kickCharge = 0; p.pose = null; p.poseTilt = 0;
+    }
+    sp.x = PEN.spotX - 36; sp.y = PEN.spotY; sp.facingAngle = 0;
+    kp.x = PEN.goalX - 14; kp.y = PEN.spotY; kp.facingAngle = Math.PI; kp.pose = 'keeper';
+
+    this.ball.reset(PEN.spotX, PEN.spotY);
+    pen.cpuDelay = 75 + Math.floor(Math.random() * 80);
+    pen.cpuTarget = this.penCpuPickTarget();
+
+    // Tecla já pressionada não conta como "clique"
+    pen.ps = this.penReadInput(pen.shooterCtrl).shoot;
+    pen.pk = this.penReadInput(pen.keeperCtrl);
+    this.updatePenaltyHud();
+  }
+
+  penShoot(y) {
+    const pen = this.pen;
+    pen.shotY = y;
+    pen.phase = 'SHOT';
+    pen.t = 0;
+    this.penPlayer(pen.shooter).kickAnimTimer = 14;
+    if (!pen.keeperHuman) pen.zone = this.penCpuKeeperZone(y);
+    audio.playKick(0.9);
+    this.triggerShake(4);
+    this.particles.addSparks(PEN.spotX, PEN.spotY, 3, 0, 8);
+  }
+
+  penResolve() {
+    const pen = this.pen;
+    const ball = this.ball;
+    const y = pen.shotY;
+    const kp = this.penPlayer(pen.keeper);
+    const shooterName = this.penPlayer(pen.shooter).name;
+    const inGoal = y > WORLD.goalYTop + 4 && y < WORLD.goalYBottom - 4;
+    const nearPost = !inGoal && y > WORLD.goalYTop - 18 && y < WORLD.goalYBottom + 18;
+    const zone = pen.zone || 'mid';
+    const saved = inGoal && Math.abs(y - PEN.zones[zone]) <= PEN.half[zone];
+    const side = y < PEN.spotY ? -1 : 1;
+    let kind, text, sub;
+
+    pen.phase = 'RESULT';
+    pen.t = 0;
+    ball.x = PEN.goalX - ball.radius;
+    ball.y = y;
+
+    if (inGoal && !saved) {
+      kind = 'goal'; text = 'GOOOOL!'; sub = `${shooterName} MANDOU PRA REDE!`;
+      ball.vx = 1.4; ball.vy = (Math.random() - 0.5) * 1.2;
+      audio.playGoal();
+      this.particles.triggerGoalConfetti();
+      this.triggerShake(10);
+    } else if (saved) {
+      kind = 'saved'; text = 'DEFENDEU!'; sub = `${kp.name} FECHOU O GOL! 🧤`;
+      ball.vx = -4.5 - Math.random() * 2;
+      ball.vy = (y >= kp.y ? 1 : -1) * (1.5 + Math.random() * 2.5);
+      audio.playBounce();
+      audio.playKick(0.5);
+      this.triggerShake(6);
+    } else if (nearPost) {
+      kind = 'miss'; text = 'NA TRAVE!'; sub = 'QUE PENA...';
+      ball.vx = -5; ball.vy = side * 2.5;
+      audio.playPost();
+      this.triggerShake(8);
+    } else {
+      kind = 'miss'; text = 'PRA FORA!'; sub = 'A BOLA FOI LONGE...';
+      ball.vx = 4; ball.vy = side * 2.5;
+    }
+
+    pen.result = kind === 'goal' ? 'goal' : 'miss';
+    pen.kicks[pen.shooter].push(kind === 'goal');
+    if (kind === 'goal') pen.scores[pen.shooter]++;
+    this.updatePenaltyHud();
+    this.showPenBanner(text, sub, kind, 95);
+  }
+
+  penCheckWinner() {
+    const pen = this.pen;
+    const kb = pen.kicks.beico.length;
+    const kr = pen.kicks.rivais.length;
+    const sb = pen.scores.beico;
+    const sr = pen.scores.rivais;
+    if (kb <= 5 && kr <= 5) {
+      if (sb > sr + (5 - kr)) return 'beico';
+      if (sr > sb + (5 - kb)) return 'rivais';
+      return null;
+    }
+    if (kb === kr && sb !== sr) return sb > sr ? 'beico' : 'rivais';
+    return null;
+  }
+
+  finishPenalties() {
+    const pen = this.pen;
+    this.penResult = { beico: pen.scores.beico, rivais: pen.scores.rivais, winner: pen.winner };
+    this.hidePenBanner();
+    document.body.classList.remove('penalties');
+    const h = document.getElementById('penalty-hud');
+    if (h) h.classList.add('hidden');
+    for (const p of this.players) { p.pose = null; p.poseT = 0; p.poseTilt = 0; }
+    this.pen = null;
+    this.endMatch();
+  }
+
+  updatePenaltyHud() {
+    const pen = this.pen;
+    if (!pen) return;
+    const render = (team, dotsId, scoreId) => {
+      const arr = pen.kicks[team];
+      const cur = (pen.shooter === team && pen.phase !== 'RESULT' && pen.phase !== 'DONE') ? arr.length : -1;
+      const total = Math.max(5, arr.length, cur + 1);
+      let html = '';
+      for (let i = 0; i < total; i++) {
+        let cls = 'pen-dot';
+        let ch = '';
+        if (i < arr.length) { cls += arr[i] ? ' goal' : ' miss'; ch = arr[i] ? '✓' : '✕'; }
+        else if (i === cur) cls += ' cur';
+        html += `<span class="${cls}">${ch}</span>`;
+      }
+      const d = document.getElementById(dotsId);
+      if (d) d.innerHTML = html;
+      const sc = document.getElementById(scoreId);
+      if (sc) sc.textContent = pen.scores[team];
+    };
+    render('beico', 'pen-dots-p1', 'pen-score-p1');
+    render('rivais', 'pen-dots-p2', 'pen-score-p2');
+
+    const single = (this.gameMode !== '2P');
+    const sName = this.penTeamName(pen.shooter);
+    const kName = this.penTeamName(pen.keeper);
+    let t;
+    if (single) {
+      t = pen.shooterHuman
+        ? '⚽ SUA VEZ DE BATER • W/S MIRA • ESPAÇO CHUTA'
+        : '🧤 VOCÊ É O GOLEIRO • W/S ESCOLHE O CANTO (ESPAÇO = MEIO)';
+    } else {
+      const sk = pen.shooterCtrl === 1 ? 'W/S + ESPAÇO' : '↑/↓ + ENTER';
+      const kk = pen.keeperCtrl === 1 ? 'W/S, ESPAÇO = MEIO' : '↑/↓, ENTER = MEIO';
+      t = !pen.zone
+        ? `🧤 ${kName} ESCOLHE O CANTO (${kk}) • ${sName} ESPERA...`
+        : `🔒 GOLEIRO PRONTO! ⚽ ${sName} BATE (${sk})`;
+    }
+    const hint = document.getElementById('pen-hint');
+    if (hint) hint.textContent = t;
+  }
+
+  updatePenalties() {
+    const pen = this.pen;
+    if (!pen) return;
+    const ball = this.ball;
+    const sp = this.penPlayer(pen.shooter);
+    const kp = this.penPlayer(pen.keeper);
+    const hot = (this.gameMode === '2P');
+
+    if (pen.bannerFrames > 0 && --pen.bannerFrames === 0) this.hidePenBanner();
+
+    // Entradas (clique = borda de subida da tecla)
+    const si = this.penReadInput(pen.shooterCtrl || 1);
+    const ki = this.penReadInput(pen.keeperCtrl || 1);
+    const shootEdge = si.shoot && !pen.ps;
+    const keeperUp = ki.up && !pen.pk.up;
+    const keeperDown = ki.down && !pen.pk.down;
+    const keeperMid = ki.shoot && !pen.pk.shoot;
+    pen.ps = si.shoot;
+    pen.pk = ki;
+
+    pen.t++;
+    for (const p of this.players) p.poseT = (p.poseT || 0) + 1;
+
+    // Goleiro humano trava o canto (antes do chute ou logo depois)
+    if (pen.keeperHuman && !pen.zone && (pen.phase === 'AIM' || (pen.phase === 'SHOT' && pen.t <= 10))) {
+      if (keeperUp) pen.zone = 'up';
+      else if (keeperDown) pen.zone = 'down';
+      else if (keeperMid) pen.zone = 'mid';
+    }
+
+    switch (pen.phase) {
+      case 'READY':
+        if (pen.t >= 70) { pen.phase = 'AIM'; pen.t = 0; }
+        break;
+
+      case 'AIM': {
+        // 2 jogadores: o goleiro escolhe primeiro (a mira só aparece depois)
+        if (hot && !pen.zone && pen.t > 240) pen.zone = 'mid';
+        if (hot && pen.zone && !pen.lockShown) { pen.lockShown = true; this.updatePenaltyHud(); }
+        const canAim = !hot || !!pen.zone;
+        if (pen.shooterHuman) {
+          if (canAim) {
+            const dy = (si.down ? 1 : 0) - (si.up ? 1 : 0);
+            pen.aimY = Math.max(WORLD.goalYTop - 36, Math.min(WORLD.goalYBottom + 36, pen.aimY + dy * 3.2));
+            if (shootEdge || pen.t > 900) this.penShoot(pen.aimY);
+          }
+        } else if (pen.t >= pen.cpuDelay) {
+          this.penShoot(pen.cpuTarget);
+        }
+        break;
+      }
+
+      case 'SHOT': {
+        const T = 36;
+        const p = Math.min(1, pen.t / T);
+        ball.x = PEN.spotX + (PEN.goalX - PEN.spotX) * p;
+        ball.y = PEN.spotY + (pen.shotY - PEN.spotY) * p;
+        ball.rotation += 0.6;
+        ball.isSuperShot = true;
+        ball.trail.unshift({ x: ball.x, y: ball.y, speed: 10 });
+        if (ball.trail.length > 8) ball.trail.pop();
+
+        if (pen.keeperHuman && !pen.zone && pen.t > 10) pen.zone = 'mid';
+        if (pen.t >= 6 && pen.zone) {
+          kp.y += (PEN.zones[pen.zone] - kp.y) * 0.16;
+          kp.poseTilt = Math.max(-0.7, Math.min(0.7, (kp.y - PEN.spotY) / 60));
+          kp.walkCycle += 0.4;
+        }
+        if (pen.t >= T) this.penResolve();
+        break;
+      }
+
+      case 'RESULT': {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        if (pen.result === 'goal') {
+          const maxX = PEN.goalX + WORLD.goalDepth - ball.radius;
+          if (ball.x > maxX) { ball.x = maxX; ball.vx *= -0.3; }
+          if (ball.x > PEN.goalX) {
+            ball.y = Math.max(WORLD.goalYTop + ball.radius, Math.min(WORLD.goalYBottom - ball.radius, ball.y));
+          }
+          ball.vx *= 0.97;
+        } else {
+          ball.vx *= 0.97;
+          ball.vy *= 0.97;
+        }
+        ball.rotation += Math.hypot(ball.vx, ball.vy) * 0.12;
+        ball.isSuperShot = false;
+        if (ball.trail.length) ball.trail.pop();
+
+        if (pen.t >= 95) {
+          const w = this.penCheckWinner();
+          if (w) {
+            pen.winner = w;
+            pen.phase = 'DONE';
+            pen.t = 0;
+            this.updatePenaltyHud();
+            this.showPenBanner(`${this.penTeamName(w)} VENCEU!`, `PÊNALTIS: ${pen.scores.beico} × ${pen.scores.rivais}`, 'win', 125);
+            audio.playWhistle(true);
+            audio.playCheer();
+          } else {
+            pen.idx++;
+            this.penBeginKick();
+          }
+        }
+        break;
+      }
+
+      case 'DONE':
+        if (pen.t >= 125) this.finishPenalties();
+        break;
+    }
+  }
+
+  drawPenaltyOverlay(ctx) {
+    const pen = this.pen;
+    const hot = (this.gameMode === '2P');
+    const gt = WORLD.goalYTop;
+    const gb = WORLD.goalYBottom;
+    const gx = PEN.goalX;
+    ctx.save();
+
+    // Mira do batedor humano
+    if (pen.shooterHuman && pen.phase === 'AIM' && (!hot || pen.zone)) {
+      const y = pen.aimY;
+      const inside = y > gt + 4 && y < gb - 4;
+      const col = inside ? '#4ade80' : '#f87171';
+      const x = gx + 14;
+      ctx.strokeStyle = col;
+      ctx.fillStyle = col;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 17, y); ctx.lineTo(x - 6, y);
+      ctx.moveTo(x + 6, y); ctx.lineTo(x + 17, y);
+      ctx.moveTo(x, y - 17); ctx.lineTo(x, y - 6);
+      ctx.moveTo(x, y + 6); ctx.lineTo(x, y + 17);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Opções do goleiro humano: cima / meio / baixo
+    if (pen.keeperHuman && (pen.phase === 'READY' || pen.phase === 'AIM' || (pen.phase === 'SHOT' && pen.t <= 12))) {
+      const opts = [['up', gt + 18, '▲'], ['mid', PEN.spotY, '●'], ['down', gb - 18, '▼']];
+      ctx.font = 'bold 16px Outfit';
+      ctx.textAlign = 'center';
+      for (const o of opts) {
+        const on = pen.zone === o[0] && !hot;
+        ctx.fillStyle = on ? '#facc15' : 'rgba(255, 255, 255, 0.55)';
+        ctx.fillText(o[2], gx + 30, o[1] + 6);
+      }
+    }
+    ctx.restore();
+  }
   triggerShake(amount) {
     this.camera.shake(amount);
   }
@@ -4040,13 +5042,17 @@ class GameEngine {
         player.kickCooldown = 0;
         player.facingAngle = player.team === 'beico' ? 0 : Math.PI;
       }
-      this.ball.x = WORLD.width / 2;
-      this.ball.y = (WORLD.courtTop + WORLD.courtBottom) / 2;
+      this.ball.x = this.ballStartX !== undefined ? this.ballStartX : WORLD.width / 2;
+      this.ball.y = this.ballStartY !== undefined ? this.ballStartY : (WORLD.courtTop + WORLD.courtBottom) / 2;
       this.ball.vx = 0;
       this.ball.vy = 0;
       this.ball.vz = 0;
       this.ball.z = 0;
       this.ball.trail = [];
+    } else if (this.state === 'CELEBRATION') {
+      this.updateCelebration();
+    } else if (this.state === 'PENALTIES') {
+      this.updatePenalties();
     } else {
       // Atualização dos jogadores
       for (const player of this.players) {
@@ -4128,6 +5134,9 @@ class GameEngine {
     // 1. Cenário da Favela & Quadra
     this.scenery.draw(ctx, WORLD.width, WORLD.height);
 
+    // Raios de luz dourados (campeão levantando a taça)
+    if (this.state === 'CELEBRATION' && this.celebration && this.celebration.type === 'trophy') this.drawCelebrationRays(ctx);
+
     // 2. Partículas do chão (poeira)
     this.particles.draw(ctx);
 
@@ -4139,8 +5148,14 @@ class GameEngine {
       item.draw(ctx);
     }
 
+    // Mira do batedor / opções do goleiro (pênaltis)
+    if (this.state === 'PENALTIES' && this.pen) this.drawPenaltyOverlay(ctx);
+
     // Restaurar Câmera
     this.camera.restoreTransform(ctx);
+
+    // Efeitos de tela cheia (celebração do torneio)
+    if (this.state === 'CELEBRATION') this.drawCelebrationOverlay(ctx, w, h);
   }
 }
 
@@ -4148,3 +5163,59 @@ class GameEngine {
 window.addEventListener('DOMContentLoaded', () => {
   window.game = game = new GameEngine();
 });
+
+// Favela no fundo do menu (SVG gerado, sem imagens externas)
+(function () {
+  const host = document.querySelector('#main-menu .menu-backdrop');
+  if (!host) return;
+  let seed = 20260;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const W = 1600, H = 900;
+  const cols = ['#c2410c','#ea580c','#9a3412','#b45309','#d97706','#e2e8f0','#cbd5e1','#78350f','#0e7490','#be123c','#facc15'];
+  let o = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="mbSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1b0b3a"/><stop offset=".45" stop-color="#931f3f"/><stop offset=".8" stop-color="#f59e0b"/><stop offset="1" stop-color="#fde68a"/>
+      </linearGradient>
+      <radialGradient id="mbSun"><stop offset="0" stop-color="#fff7cc"/><stop offset=".4" stop-color="#fbbf24"/><stop offset="1" stop-color="#fbbf24" stop-opacity="0"/></radialGradient>
+      <linearGradient id="mbFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".55" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity=".85"/>
+      </linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="url(#mbSky)"/>
+    <circle cx="1180" cy="330" r="190" fill="url(#mbSun)"/>
+    <path d="M0 470 Q300 330 620 420 T1250 380 T1600 430 V900 H0Z" fill="#14532d" opacity=".9"/>`;
+  const rows = 7;
+  for (let i = 0; i < rows; i++) {
+    const k = i / (rows - 1);                 // 0 = longe, 1 = perto
+    const base = 470 + i * 62;
+    const hMin = 40 + k * 55, hMax = 70 + k * 85;
+    let x = -60 - rnd() * 60;
+    while (x < W + 40) {
+      const w = 56 + k * 40 + rnd() * 46;
+      const h = hMin + rnd() * (hMax - hMin);
+      const c = cols[Math.floor(rnd() * cols.length)];
+      const y = base - h;
+      o += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${c}"/>`;
+      o += `<rect x="${(x - 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" width="${(w + 4).toFixed(1)}" height="7" fill="#57534e"/>`;
+      if (rnd() < 0.45) o += `<rect x="${(x + w * 0.3).toFixed(1)}" y="${(y - 5 - 16 - k * 8).toFixed(1)}" width="${(18 + k * 8).toFixed(1)}" height="${(16 + k * 8).toFixed(1)}" rx="3" fill="#0284c7"/>`;
+      const ww = 9 + k * 8, wh = 12 + k * 9;
+      for (let wx = x + 10; wx + ww < x + w - 6; wx += ww + 14) {
+        for (let wy = y + 12; wy + wh < y + h - 6; wy += wh + 16) {
+          const lit = rnd() < 0.35;
+          o += `<rect x="${wx.toFixed(1)}" y="${wy.toFixed(1)}" width="${ww.toFixed(1)}" height="${wh.toFixed(1)}" fill="${lit ? '#fde047' : '#1e293b'}"${lit ? ' opacity=".9"' : ''}/>`;
+        }
+      }
+      x += w + 3 + rnd() * 8;
+    }
+    if (i < rows - 1) o += `<rect width="${W}" height="${H}" fill="#f59e0b" opacity=".07"/>`;
+  }
+  // fios de poste, tênis pendurado e bandeira
+  o += `<g stroke="#0a0a0a" stroke-width="2.5" fill="none">
+      <path d="M-20 250 Q400 360 800 290 T1620 300"/><path d="M-20 300 Q420 410 820 340 T1620 350"/>
+      <path d="M260 120 V420 M1380 90 V430" stroke-width="6"/></g>
+    <g fill="#dc2626"><rect x="640" y="300" width="14" height="9" rx="2"/><rect x="658" y="306" width="14" height="9" rx="2"/></g>
+    <path d="M1380 90 h58 l-8 14 l8 14 h-58z" fill="#00a859"/><path d="M1394 104 l15-9 l15 9 l-15 9z" fill="#ffd400"/>
+    <rect width="${W}" height="${H}" fill="url(#mbFade)"/></svg>`;
+  host.innerHTML = o;
+})();
