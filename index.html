@@ -184,6 +184,8 @@
         <div class="ranking-body">
           <div id="ranking-status" class="ranking-status"></div>
           <ol id="ranking-list" class="ranking-list"></ol>
+          <div class="hall-title">👑 HALL DOS CAMPEÕES — ÚLTIMOS VENCEDORES</div>
+          <ul id="hall-list" class="hall-list"></ul>
         </div>
         <div class="tournament-footer">
           <button id="btn-ranking-play" class="btn-street btn-primary"><span>🏆</span> JOGAR A TAÇA</button>
@@ -448,6 +450,14 @@
         <p id="tourney-result-desc" class="tourney-desc">Você venceu e garantiu vaga na próxima fase da Taça das Favela!</p>
 
         <div id="tourney-rank-info" class="tourney-rank-info hidden"></div>
+        <div id="champ-name-box" class="champ-name-box hidden">
+          <label for="champ-name-input">✍️ Coloque seu nome no Hall dos Campeões:</label>
+          <div class="champ-name-row">
+            <input id="champ-name-input" type="text" maxlength="16" autocomplete="off" placeholder="Seu nome ou apelido">
+            <button id="champ-name-btn" class="btn-street btn-primary" type="button">SALVAR</button>
+          </div>
+          <div id="champ-name-msg" class="champ-name-msg"></div>
+        </div>
 
         <div class="final-score-board tourney-score-board">
           <div class="final-team">
