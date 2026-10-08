@@ -329,119 +329,375 @@ const WORLD = {
 };
 
 // ====================================================================
-// 2.1 ESTRUTURA DO TORNEIO (OITAVAS, QUARTAS, SEMIS E FINAL)
-// Dificuldade progressiva calibrada por atributos e inteligência
+// 2.1 TIMES E ESTRUTURA DA TAÇA DAS FAVELAS DE CAMPINAS
+// Catálogo oficial das comunidades e gerador de chaveamento progressivo
 // ====================================================================
-const TOURNAMENT_ROUNDS = [
+const CAMPINAS_FAVELA_TEAMS = [
   {
-    id: 'oitavas',
-    name: 'Oitavas de Final',
-    tag: 'FASE 1 / 4',
-    badge: '🏆 OITAVAS DE FINAL',
-    difficultyLabel: 'FÁCIL',
-    stars: '⭐',
-    description: 'Bielzinho ainda está pegando o ritmo da quebrada. Chutes mais lentos e marcação frouxa. Hora de aquecer o pé!',
-    opponent: {
-      name: 'Bielzinho #7',
-      shortName: 'BIELZINHO',
-      subName: 'CRIAS DO BECO',
-      team: 'rivais',
-      number: '7',
-      avatar: '⚽',
-      skinTone: '#b5784a',
-      shirtColor: '#f97316', // Laranja vibrante
-      shortsColor: '#ffffff',
-      hairStyle: 'buzz',
-      hairColor: '#171717',
-      speed: 2.55,
-      kickPowerMax: 10.5,
-      aiLeadFrames: 3,
-      aiAttackDist: 200,
-      kickPowerDefault: 0.65
-    }
+    id: 'sao-bernardo',
+    name: 'São Bernardo',
+    shortName: 'S. BERNARDO',
+    region: 'Região Sul',
+    starPlayer: 'Diguinho #10',
+    number: '10',
+    avatar: '🦅',
+    shirtColor: '#1d4ed8', // Azul Real
+    shortsColor: '#facc15', // Amarelo Dourado
+    skinTone: '#8d5524',
+    hairStyle: 'afro',
+    hairColor: '#171717',
+    tagline: 'O Gigante da Região Sul • Campeão da Taça',
+    stats: { vel: 92, chute: 90, raca: 95 },
+    description: 'Comunidade tradicionalíssima da Região Sul de Campinas, berço de campeões com toque refinado e torcida apaixonada.',
+    tier: 1
   },
   {
-    id: 'quartas',
-    name: 'Quartas de Final',
-    tag: 'FASE 2 / 4',
-    badge: '🏆 QUARTAS DE FINAL',
-    difficultyLabel: 'MÉDIA',
-    stars: '⭐⭐',
-    description: 'Zica conhece os atalhos do cimento da favela. Tem boa velocidade, marca de perto e usa bem as paredes.',
-    opponent: {
-      name: 'Zica #11',
-      shortName: 'ZICA',
-      subName: 'TERRA DA PONTE',
-      team: 'rivais',
-      number: '11',
-      avatar: '⚡',
-      skinTone: '#5c3826',
-      shirtColor: '#10b981', // Verde esmeralda
-      shortsColor: '#0f172a',
-      hairStyle: 'dreads',
-      hairColor: '#0f172a',
-      speed: 2.80,
-      kickPowerMax: 12.5,
-      aiLeadFrames: 6,
-      aiAttackDist: 270,
-      kickPowerDefault: 0.80
-    }
+    id: 'paranapanema',
+    name: 'Paranapanema',
+    shortName: 'PANEMA',
+    region: 'Região Sul (Colina)',
+    starPlayer: 'Vitinho #11',
+    number: '11',
+    avatar: '⚡',
+    shirtColor: '#dc2626', // Vermelho Rubi
+    shortsColor: '#18181b', // Preto
+    skinTone: '#5c3826',
+    hairStyle: 'dreads',
+    hairColor: '#171717',
+    tagline: 'O Terror da Colina • Garra e Coração',
+    stats: { vel: 95, chute: 92, raca: 98 },
+    description: 'A histórica comunidade do Panema. Time com intensidade feroz, dribles desconcertantes e uma das maiores potências de Campinas.',
+    tier: 1
   },
   {
-    id: 'semi',
-    name: 'Semifinais',
-    tag: 'FASE 3 / 4',
-    badge: '🏆 SEMIFINAL',
-    difficultyLabel: 'DIFÍCIL',
-    stars: '⭐⭐⭐',
-    description: 'Caveira é o artilheiro da ladeira. Chute pesado, bote agressivo e não perdoa na cara do gol. Jogo pegado!',
-    opponent: {
-      name: 'Caveira #9',
-      shortName: 'CAVEIRA',
-      subName: 'DO OUTRO LADO',
-      team: 'rivais',
-      number: '9',
-      avatar: '🔥',
-      skinTone: '#a16207',
-      shirtColor: '#ef4444', // Vermelho fogo
-      shortsColor: '#4338ca',
-      hairStyle: 'blonde',
-      hairColor: '#fef08a',
-      speed: 3.00,
-      kickPowerMax: 14.5,
-      aiLeadFrames: 9,
-      aiAttackDist: 340,
-      kickPowerDefault: 0.95
-    }
+    id: 'padre-anchieta',
+    name: 'Padre Anchieta',
+    shortName: 'P. ANCHIETA',
+    region: 'Região Norte',
+    starPlayer: 'Kauã #7',
+    number: '7',
+    avatar: '🛡️',
+    shirtColor: '#0284c7', // Azul Celeste
+    shortsColor: '#ffffff', // Branco
+    skinTone: '#b5784a',
+    hairStyle: 'blonde',
+    hairColor: '#fef08a',
+    tagline: 'Gigante da Zona Norte • Atual Campeão',
+    stats: { vel: 90, chute: 94, raca: 92 },
+    description: 'Campeão da Taça das Favelas de Campinas! Time tático, com bomba de fora da área e futebol agressivo e veloz.',
+    tier: 1
   },
   {
-    id: 'final',
-    name: 'Grande Final',
-    tag: 'DECISÃO DO TÍTULO',
-    badge: '👑 GRANDE FINAL',
-    difficultyLabel: 'CHEFE / LENDÁRIO',
-    stars: '⭐⭐⭐⭐ 👑',
-    description: 'Gildásio é o Rei do Asfalto. Velocidade máxima, reflexo imediato e bombas venenosas no ângulo. Valendo a taça!',
-    opponent: {
-      name: 'Gildásio #10',
-      shortName: 'GILDÁSIO',
-      subName: 'REI DO ASFALTO',
-      team: 'rivais',
-      number: '10',
-      avatar: '👑',
-      skinTone: '#78350f',
-      shirtColor: '#854d0e', // Dourado escuro / Preto real
-      shortsColor: '#18181b',
-      hairStyle: 'afro',
-      hairColor: '#eab308', // Dourado
-      speed: 3.25,
-      kickPowerMax: 14.5,
-      aiLeadFrames: 12,
-      aiAttackDist: 430,
-      kickPowerDefault: 1.0
-    }
+    id: 'sao-marcos',
+    name: 'São Marcos',
+    shortName: 'SÃO MARCOS',
+    region: 'Região Leste',
+    starPlayer: 'Biel #9',
+    number: '9',
+    avatar: '🦁',
+    shirtColor: '#15803d', // Verde Esmeralda
+    shortsColor: '#ffffff', // Branco
+    skinTone: '#78350f',
+    hairStyle: 'buzz',
+    hairColor: '#171717',
+    tagline: 'A Força do São Marcos • Tradição da Quebrada',
+    stats: { vel: 89, chute: 91, raca: 94 },
+    description: 'Multicampeão com história pesada nos gramados e quadras de Campinas. Presença de área fulminante e raça pura.',
+    tier: 1
+  },
+  {
+    id: 'satelite-iris',
+    name: 'Satélite Íris',
+    shortName: 'SATÉLITE',
+    region: 'Região Noroeste',
+    starPlayer: 'Renan #8',
+    number: '8',
+    avatar: '🪐',
+    shirtColor: '#881337', // Vinho / Bordô
+    shortsColor: '#f8fafc', // Branco gelo
+    skinTone: '#a16207',
+    hairStyle: 'afro',
+    hairColor: '#1c1917',
+    tagline: 'Raça do Satélite • Orgulho do Noroeste',
+    stats: { vel: 88, chute: 88, raca: 93 },
+    description: 'Finalista emblemático de Campinas. Equipe que nunca desiste de nenhuma bola, brigando até o último apito do juiz.',
+    tier: 2
+  },
+  {
+    id: 'campo-belo',
+    name: 'Campo Belo',
+    shortName: 'CAMPO BELO',
+    region: 'Região Viracopos',
+    starPlayer: 'Bruninho #10',
+    number: '10',
+    avatar: '✈️',
+    shirtColor: '#ea580c', // Laranja Fogo
+    shortsColor: '#1e3a8a', // Azul Marinho
+    skinTone: '#6b3e26',
+    hairStyle: 'buzz',
+    hairColor: '#171717',
+    tagline: 'Voando Alto • Força de Viracopos',
+    stats: { vel: 93, chute: 87, raca: 90 },
+    description: 'Time de velocidade relâmpago vindo da grande comunidade do Campo Belo. Contra-ataques mortais no asfalto.',
+    tier: 2
+  },
+  {
+    id: 'florence-ii',
+    name: 'Florence II',
+    shortName: 'FLORENCE',
+    region: 'Campo Grande',
+    starPlayer: 'Juninho #11',
+    number: '11',
+    avatar: '💎',
+    shirtColor: '#7c3aed', // Roxo Neon
+    shortsColor: '#ffffff', // Branco
+    skinTone: '#5c3826',
+    hairStyle: 'blonde',
+    hairColor: '#fde047',
+    tagline: 'Brilho do Campo Grande • Futebol Arte',
+    stats: { vel: 91, chute: 90, raca: 88 },
+    description: 'Dribles plásticos e magia na ponta dos pés. A comunidade do Florence traz talento puro e ousadia nas tabelas.',
+    tier: 2
+  },
+  {
+    id: 'parque-brasilia',
+    name: 'Parque Brasília',
+    shortName: 'PQ. BRASÍLIA',
+    region: 'Região Leste',
+    starPlayer: 'Pedrinho #10',
+    number: '10',
+    avatar: '🌟',
+    shirtColor: '#06b6d4', // Ciano / Azul Turquesa
+    shortsColor: '#0f172a', // Azul Noite
+    skinTone: '#b5784a',
+    hairStyle: 'afro',
+    hairColor: '#171717',
+    tagline: 'Estrela da Quebrada • Campeão da Raça',
+    stats: { vel: 90, chute: 91, raca: 91 },
+    description: 'Comunidade vibrante e unida, campeã na categoria feminina e grande potência das quadras da Zona Leste.',
+    tier: 2
+  },
+  {
+    id: 'costa-e-silva',
+    name: 'Costa e Silva',
+    shortName: 'COSTA & SILVA',
+    region: 'Região Norte',
+    starPlayer: 'Marcelinho #5',
+    number: '5',
+    avatar: '🐅',
+    shirtColor: '#eab308', // Amarelo Canário
+    shortsColor: '#18181b', // Preto
+    skinTone: '#8d5524',
+    hairStyle: 'afro',
+    hairColor: '#000000',
+    tagline: 'Guerreiros Amarelos • Marcação Pesada',
+    stats: { vel: 87, chute: 89, raca: 92 },
+    description: 'Tradição do futebol de várzea campineiro. Marcação implacável colada na quadra e chutes venenosos de média distância.',
+    tier: 3
+  },
+  {
+    id: 'dic-vi',
+    name: 'DIC VI',
+    shortName: 'DIC VI',
+    region: 'Distrito Industrial',
+    starPlayer: 'Thiaguinho #6',
+    number: '6',
+    avatar: '⚙️',
+    shirtColor: '#334155', // Cinza Chumbo
+    shortsColor: '#dc2626', // Vermelho
+    skinTone: '#a16207',
+    hairStyle: 'buzz',
+    hairColor: '#171717',
+    tagline: 'Paredão do DIC • Força Indestrutível',
+    stats: { vel: 86, chute: 92, raca: 96 },
+    description: 'O famoso Paredão do DIC. Futebol de força física, divididas firmes e pancada na gaveta.',
+    tier: 3
+  },
+  {
+    id: 'cafezinho',
+    name: 'Cafezinho',
+    shortName: 'CAFEZINHO',
+    region: 'Região Sul',
+    starPlayer: 'Nenê #9',
+    number: '9',
+    avatar: '☕',
+    shirtColor: '#78350f', // Marrom Café
+    shortsColor: '#facc15', // Amarelo
+    skinTone: '#78350f',
+    hairStyle: 'buzz',
+    hairColor: '#171717',
+    tagline: 'Ginga Pura • Respeita a Tradição',
+    stats: { vel: 89, chute: 87, raca: 89 },
+    description: 'Time irreverente da Região Sul de Campinas, rápido nas roubadas de bola e no contragolpe.',
+    tier: 3
+  },
+  {
+    id: 'vida-nova',
+    name: 'Vida Nova',
+    shortName: 'VIDA NOVA',
+    region: 'Região Sudoeste',
+    starPlayer: 'Danilinho #7',
+    number: '7',
+    avatar: '🌱',
+    shirtColor: '#16a34a', // Verde Vivo
+    shortsColor: '#1e293b', // Grafite
+    skinTone: '#8d5524',
+    hairStyle: 'blonde',
+    hairColor: '#fef08a',
+    tagline: 'Esperança e Futuro • Muita Bola no Pé',
+    stats: { vel: 91, chute: 88, raca: 90 },
+    description: 'A energia da juventude do Sudoeste campineiro, com transições velozes e muita sede de vitória.',
+    tier: 3
   }
 ];
+
+function generateCampinasTournamentRounds(userTeamId) {
+  const userTeam = CAMPINAS_FAVELA_TEAMS.find(t => t.id === userTeamId) || CAMPINAS_FAVELA_TEAMS[0];
+  const availableTeams = CAMPINAS_FAVELA_TEAMS.filter(t => t.id !== userTeam.id);
+
+  // Pool Tier 3 (Oitavas)
+  const tier3 = availableTeams.filter(t => t.tier === 3);
+  const round1Team = tier3[Math.floor(Math.random() * tier3.length)] || availableTeams[0];
+
+  // Pool Tier 2 (Quartas)
+  const tier2 = availableTeams.filter(t => t.tier === 2 && t.id !== round1Team.id);
+  const round2Team = (tier2.length > 0 ? tier2 : availableTeams.filter(t => t.id !== round1Team.id))[0];
+
+  // Pool Semifinal (Times fortes diferentes dos anteriores)
+  const semiPool = availableTeams.filter(t => t.id !== round1Team.id && t.id !== round2Team.id);
+  const semiCandidates = semiPool.filter(t => t.tier <= 2);
+  const round3Team = (semiCandidates.length > 0 ? semiCandidates : semiPool)[0];
+
+  // Pool Final (Gigantes da Quebrada: Paranapanema, São Bernardo, Padre Anchieta, São Marcos)
+  const finalPool = availableTeams.filter(t => t.id !== round1Team.id && t.id !== round2Team.id && t.id !== round3Team.id);
+  const finalGiants = finalPool.filter(t => t.tier === 1);
+  const round4Team = (finalGiants.length > 0 ? finalGiants : finalPool)[0] || finalPool[0];
+
+  return [
+    {
+      id: 'oitavas',
+      name: 'Oitavas de Final',
+      tag: 'FASE 1 / 4',
+      badge: '🏆 OITAVAS DE FINAL',
+      difficultyLabel: 'FÁCIL',
+      stars: '⭐',
+      description: `${round1Team.name} (${round1Team.region}) chega com garra. O craque ${round1Team.starPlayer} puxa o contra-ataque. Pressione a saída de bola para dominar a partida!`,
+      opponent: {
+        teamId: round1Team.id,
+        name: `${round1Team.starPlayer} (${round1Team.shortName})`,
+        shortName: round1Team.shortName,
+        teamFullName: round1Team.name,
+        region: round1Team.region,
+        subName: `${round1Team.name.toUpperCase()} • ${round1Team.region.toUpperCase()}`,
+        team: 'rivais',
+        number: round1Team.number,
+        avatar: round1Team.avatar,
+        skinTone: round1Team.skinTone,
+        shirtColor: round1Team.shirtColor,
+        shortsColor: round1Team.shortsColor,
+        hairStyle: round1Team.hairStyle,
+        hairColor: round1Team.hairColor,
+        speed: 2.55,
+        kickPowerMax: 10.5,
+        aiLeadFrames: 3,
+        aiAttackDist: 210,
+        kickPowerDefault: 0.65
+      }
+    },
+    {
+      id: 'quartas',
+      name: 'Quartas de Final',
+      tag: 'FASE 2 / 4',
+      badge: '🏆 QUARTAS DE FINAL',
+      difficultyLabel: 'MÉDIA',
+      stars: '⭐⭐',
+      description: `${round2Team.name} joga com velocidade e conhece bem os atalhos do asfalto. O craque ${round2Team.starPlayer} bate forte na bola. Fique atento às tabelas nas paredes!`,
+      opponent: {
+        teamId: round2Team.id,
+        name: `${round2Team.starPlayer} (${round2Team.shortName})`,
+        shortName: round2Team.shortName,
+        teamFullName: round2Team.name,
+        region: round2Team.region,
+        subName: `${round2Team.name.toUpperCase()} • ${round2Team.region.toUpperCase()}`,
+        team: 'rivais',
+        number: round2Team.number,
+        avatar: round2Team.avatar,
+        skinTone: round2Team.skinTone,
+        shirtColor: round2Team.shirtColor,
+        shortsColor: round2Team.shortsColor,
+        hairStyle: round2Team.hairStyle,
+        hairColor: round2Team.hairColor,
+        speed: 2.80,
+        kickPowerMax: 12.5,
+        aiLeadFrames: 6,
+        aiAttackDist: 275,
+        kickPowerDefault: 0.80
+      }
+    },
+    {
+      id: 'semi',
+      name: 'Semifinais',
+      tag: 'FASE 3 / 4',
+      badge: '🏆 SEMIFINAL',
+      difficultyLabel: 'DIFÍCIL',
+      stars: '⭐⭐⭐',
+      description: `Semifinal de arrepiar contra ${round3Team.name}! O artilheiro ${round3Team.starPlayer} tem chute potente e desarme agressivo. Quem vacilar dá adeus ao sonho do título!`,
+      opponent: {
+        teamId: round3Team.id,
+        name: `${round3Team.starPlayer} (${round3Team.shortName})`,
+        shortName: round3Team.shortName,
+        teamFullName: round3Team.name,
+        region: round3Team.region,
+        subName: `${round3Team.name.toUpperCase()} • ${round3Team.region.toUpperCase()}`,
+        team: 'rivais',
+        number: round3Team.number,
+        avatar: round3Team.avatar,
+        skinTone: round3Team.skinTone,
+        shirtColor: round3Team.shirtColor,
+        shortsColor: round3Team.shortsColor,
+        hairStyle: round3Team.hairStyle,
+        hairColor: round3Team.hairColor,
+        speed: 3.00,
+        kickPowerMax: 14.0,
+        aiLeadFrames: 9,
+        aiAttackDist: 345,
+        kickPowerDefault: 0.92
+      }
+    },
+    {
+      id: 'final',
+      name: 'Grande Final',
+      tag: 'DECISÃO DO TÍTULO',
+      badge: '👑 GRANDE FINAL',
+      difficultyLabel: 'CHEFE / LENDÁRIO',
+      stars: '⭐⭐⭐⭐ 👑',
+      description: `A GRANDE FINAL DA TAÇA DAS FAVELAS DE CAMPINAS! O clássico supremo contra o gigante ${round4Team.name}! O camisa 10 ${round4Team.starPlayer} é lenda viva: velocidade máxima e bombas venenosas. Vale a taça e a glória eterna!`,
+      opponent: {
+        teamId: round4Team.id,
+        name: `${round4Team.starPlayer} (${round4Team.shortName})`,
+        shortName: round4Team.shortName,
+        teamFullName: round4Team.name,
+        region: round4Team.region,
+        subName: `${round4Team.name.toUpperCase()} • REI DA QUEBRADA`,
+        team: 'rivais',
+        number: round4Team.number,
+        avatar: round4Team.avatar,
+        skinTone: round4Team.skinTone,
+        shirtColor: round4Team.shirtColor,
+        shortsColor: round4Team.shortsColor,
+        hairStyle: round4Team.hairStyle,
+        hairColor: round4Team.hairColor,
+        speed: 3.25,
+        kickPowerMax: 14.8,
+        aiLeadFrames: 12,
+        aiAttackDist: 430,
+        kickPowerDefault: 1.0
+      }
+    }
+  ];
+}
+
+let TOURNAMENT_ROUNDS = generateCampinasTournamentRounds('sao-bernardo');
 
 // ====================================================================
 // 3. SISTEMA DE PARTÍCULAS E EFEITOS VISUAIS
@@ -2715,10 +2971,15 @@ class GameEngine {
     this.state = 'MENU'; // 'MENU', 'COUNTDOWN', 'PLAYING', 'GOAL', 'GAMEOVER'
     this.gameMode = '1P'; // '1P', '2P' ou 'TOURNAMENT'
 
-    // Modo Torneio (Copa da Quebrada - 4 Fases Progressivas)
+    // Modo Torneio (Taça das Favelas de Campinas - 4 Fases Progressivas)
     this.isTournament = false;
     this.tournamentRound = 0; // 0 = Oitavas, 1 = Quartas, 2 = Semis, 3 = Final
     this.isGoldenGoal = false;
+
+    // Time Selecionado da Taça das Favelas de Campinas
+    this.selectedCampinasTeam = this.loadSelectedCampinasTeam();
+    this.tournamentRounds = generateCampinasTournamentRounds(this.selectedCampinasTeam.id);
+    TOURNAMENT_ROUNDS = this.tournamentRounds;
 
     // Tempo de Partida (2 minutos = 120 segundos)
     this.matchDuration = 120;
@@ -2770,9 +3031,20 @@ class GameEngine {
     this.tournamentStageBadge = document.getElementById('tournament-stage-badge');
     this.tournamentStageText = document.getElementById('tournament-stage-text');
 
+    // Nomes e Logos no Placar
+    this.p1ScoreName = document.getElementById('name-p1');
+    this.p1ScoreSub = document.getElementById('sub-p1');
+    this.p1ScoreLogo = document.getElementById('logo-p1');
+
     this.rivalScoreName = document.getElementById('name-rivais');
     this.rivalScoreSub = document.getElementById('sub-rivais');
     this.rivalScoreLogo = document.getElementById('logo-rivais');
+
+    // Seletor de Times da Taça das Favelas Campinas
+    this.selectedTeamBadge = document.getElementById('selected-team-badge');
+    this.teamsCarousel = document.getElementById('campinas-teams-carousel');
+    this.btnScrollTeamsLeft = document.getElementById('btn-scroll-teams-left');
+    this.btnScrollTeamsRight = document.getElementById('btn-scroll-teams-right');
 
     // Ajuste de Resolução
     this.resizeCanvas();
@@ -2786,29 +3058,143 @@ class GameEngine {
     requestAnimationFrame((t) => this.gameLoop(t));
   }
 
+  // Carregar time salvo ou definir padrão (São Bernardo)
+  loadSelectedCampinasTeam() {
+    try {
+      const savedId = localStorage.getItem('beico_campinas_selected_team_id');
+      if (savedId) {
+        const found = CAMPINAS_FAVELA_TEAMS.find(t => t.id === savedId);
+        if (found) return found;
+      }
+    } catch (e) {}
+    return CAMPINAS_FAVELA_TEAMS[0]; // São Bernardo
+  }
+
+  // Selecionar time da Taça das Favelas de Campinas
+  selectCampinasTeam(teamId) {
+    const team = CAMPINAS_FAVELA_TEAMS.find(t => t.id === teamId);
+    if (!team) return;
+    this.selectedCampinasTeam = team;
+    try {
+      localStorage.setItem('beico_campinas_selected_team_id', team.id);
+    } catch (e) {}
+
+    // Regenera chaveamento para enfrentar outros times de Campinas sem colisão
+    this.tournamentRounds = generateCampinasTournamentRounds(team.id);
+    TOURNAMENT_ROUNDS = this.tournamentRounds;
+    this.tournamentRound = 0; // Reinicia na Fase 1 para a nova jornada
+
+    // Atualiza aparência do jogador P1
+    if (this.players && this.players[0]) {
+      this.applyPlayerTeamAppearance(this.players[0], team);
+    }
+
+    // Atualiza interface do torneio
+    this.updateCampinasTeamSelectorUI();
+    this.updateTournamentBracketUI();
+    audio.playClick();
+  }
+
+  applyPlayerTeamAppearance(player, team) {
+    if (!player || !team) return;
+    player.name = team.starPlayer;
+    player.shirtColor = team.shirtColor;
+    player.shortsColor = team.shortsColor;
+    player.skinTone = team.skinTone;
+    player.hairStyle = team.hairStyle;
+    player.hairColor = team.hairColor;
+    player.number = team.number;
+  }
+
+  initCampinasTeamSelector() {
+    const container = document.getElementById('campinas-teams-carousel');
+    if (!container) return;
+
+    container.innerHTML = '';
+    CAMPINAS_FAVELA_TEAMS.forEach(team => {
+      const card = document.createElement('div');
+      card.className = `team-card-campinas ${this.selectedCampinasTeam && this.selectedCampinasTeam.id === team.id ? 'selected' : ''}`;
+      card.dataset.teamId = team.id;
+
+      card.innerHTML = `
+        ${this.selectedCampinasTeam && this.selectedCampinasTeam.id === team.id ? '<div class="team-card-badge-active">SEU TIME ⭐</div>' : ''}
+        <div class="team-card-avatar-wrap" style="background: ${team.shirtColor}22; border-color: ${team.shirtColor};">
+          <span>${team.avatar}</span>
+        </div>
+        <div class="team-card-kit-preview" title="Cores do manto">
+          <div class="kit-swatch-shirt" style="background: ${team.shirtColor};" title="Camisa"></div>
+          <div class="kit-swatch-shorts" style="background: ${team.shortsColor};" title="Calção"></div>
+        </div>
+        <div class="team-card-name" title="${team.name}">${team.name.toUpperCase()}</div>
+        <div class="team-card-region">${team.region}</div>
+        <div class="team-card-player">${team.starPlayer}</div>
+        <div class="team-card-stats">
+          <span><span class="stat-label">VEL</span>${team.stats.vel}</span>
+          <span><span class="stat-label">CHU</span>${team.stats.chute}</span>
+          <span><span class="stat-label">RAÇA</span>${team.stats.raca}</span>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        this.selectCampinasTeam(team.id);
+      });
+
+      container.appendChild(card);
+    });
+
+    this.updateCampinasTeamSelectorUI();
+  }
+
+  updateCampinasTeamSelectorUI() {
+    const badge = document.getElementById('selected-team-badge');
+    if (badge && this.selectedCampinasTeam) {
+      badge.textContent = `${this.selectedCampinasTeam.name.toUpperCase()} (SEU TIME ⭐)`;
+    }
+
+    const cards = document.querySelectorAll('.team-card-campinas');
+    cards.forEach(card => {
+      const isSelected = this.selectedCampinasTeam && card.dataset.teamId === this.selectedCampinasTeam.id;
+      if (isSelected) {
+        card.classList.add('selected');
+        if (!card.querySelector('.team-card-badge-active')) {
+          const activeTag = document.createElement('div');
+          activeTag.className = 'team-card-badge-active';
+          activeTag.textContent = 'SEU TIME ⭐';
+          card.prepend(activeTag);
+        }
+      } else {
+        card.classList.remove('selected');
+        const activeTag = card.querySelector('.team-card-badge-active');
+        if (activeTag) activeTag.remove();
+      }
+    });
+  }
+
   initPlayers() {
+    const t = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
     this.players = [
-      // TIME BEIÇO (P1)
+      // TIME DO JOGADOR (P1)
       new Player({
-        name: 'Beiço #10',
+        name: t.starPlayer,
         team: 'beico',
         isControlled: true,
         controlId: 1,
         role: 'striker',
         homeX: 430,
         homeY: 430,
-        skinTone: '#8d5524',
-        shirtColor: '#facc15',
-        shortsColor: '#047857',
-        hairStyle: 'blonde', // Nevou
-        number: '10'
+        skinTone: t.skinTone,
+        shirtColor: t.shirtColor,
+        shortsColor: t.shortsColor,
+        hairStyle: t.hairStyle,
+        hairColor: t.hairColor,
+        number: t.number
       }),
 
       // TIME RIVAIS (P2 / IA)
       new Player({
         name: 'Caveira #9',
         team: 'rivais',
-        isControlled: false, // Pode virar P2 no modo 2 Jogadores, ou IA no modo 1P
+        isControlled: false,
         controlId: 2,
         role: 'striker',
         homeX: 870,
@@ -2969,6 +3355,25 @@ class GameEngine {
       });
     }
 
+    // Scroll lateral do seletor de times da Taça das Favelas Campinas
+    const btnScrollLeft = document.getElementById('btn-scroll-teams-left');
+    const btnScrollRight = document.getElementById('btn-scroll-teams-right');
+    const teamsCarousel = document.getElementById('campinas-teams-carousel');
+
+    if (btnScrollLeft && teamsCarousel) {
+      btnScrollLeft.addEventListener('click', () => {
+        audio.playClick();
+        teamsCarousel.scrollBy({ left: -220, behavior: 'smooth' });
+      });
+    }
+
+    if (btnScrollRight && teamsCarousel) {
+      btnScrollRight.addEventListener('click', () => {
+        audio.playClick();
+        teamsCarousel.scrollBy({ left: 220, behavior: 'smooth' });
+      });
+    }
+
     // Como Jogar
     document.getElementById('btn-how-to-play').addEventListener('click', () => {
       audio.init();
@@ -3015,13 +3420,14 @@ class GameEngine {
   }
 
   // ====================================================================
-  // SISTEMA DO MODO TORNEIO (COPA DA QUEBRADA)
+  // SISTEMA DO MODO TORNEIO (TAÇA DAS FAVELAS DE CAMPINAS)
   // ====================================================================
   openTournamentModal() {
     this.mainMenu.classList.remove('active');
     this.mainMenu.classList.add('hidden');
     this.tournamentModal.classList.remove('hidden');
     this.tournamentModal.classList.add('active');
+    this.initCampinasTeamSelector();
     this.updateTournamentBracketUI();
   }
 
@@ -3033,13 +3439,24 @@ class GameEngine {
   }
 
   updateTournamentBracketUI() {
-    const curRound = Math.min(Math.max(0, this.tournamentRound), TOURNAMENT_ROUNDS.length - 1);
-    const roundData = TOURNAMENT_ROUNDS[curRound];
+    const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
+    const curRound = Math.min(Math.max(0, this.tournamentRound), rounds.length - 1);
+    const roundData = rounds[curRound];
+    const myTeam = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
 
     // Atualiza os 4 degraus do bracket visual (Oitavas, Quartas, Semis, Final)
-    for (let i = 0; i < TOURNAMENT_ROUNDS.length; i++) {
+    for (let i = 0; i < rounds.length; i++) {
       const stepEl = document.getElementById(`bracket-step-${i}`);
       const statusEl = document.getElementById(`bracket-status-${i}`);
+      const avatarEl = document.getElementById(`bracket-avatar-${i}`);
+      const nameEl = document.getElementById(`bracket-name-${i}`);
+      const diffEl = document.getElementById(`bracket-diff-${i}`);
+      const rData = rounds[i];
+
+      if (avatarEl && rData) avatarEl.textContent = rData.opponent.avatar;
+      if (nameEl && rData) nameEl.textContent = rData.opponent.shortName || rData.opponent.teamFullName;
+      if (diffEl && rData) diffEl.textContent = `${rData.difficultyLabel} ${rData.stars}`;
+
       if (!stepEl || !statusEl) continue;
 
       stepEl.classList.remove('step-completed', 'step-current', 'step-locked');
@@ -3060,13 +3477,28 @@ class GameEngine {
       }
     }
 
-    // Card de Destaque do Confronto
-    const avatarEl = document.getElementById('matchup-rival-avatar');
-    const nameEl = document.getElementById('matchup-rival-name');
-    const subEl = document.getElementById('matchup-rival-sub');
-    if (avatarEl) avatarEl.textContent = roundData.opponent.avatar;
-    if (nameEl) nameEl.textContent = roundData.opponent.name.toUpperCase();
-    if (subEl) subEl.textContent = (roundData.opponent.subName || 'RIVAIS').toUpperCase();
+    // Card de Destaque do Confronto: SEU TIME vs RIVAL DE CAMPINAS
+    const p1Avatar = document.getElementById('matchup-p1-avatar');
+    const p1Name = document.getElementById('matchup-p1-name');
+    const p1Sub = document.getElementById('matchup-p1-sub');
+    if (p1Avatar) {
+      p1Avatar.textContent = myTeam.avatar;
+      p1Avatar.style.borderColor = myTeam.shirtColor;
+      p1Avatar.style.background = `${myTeam.shirtColor}33`;
+    }
+    if (p1Name) p1Name.textContent = myTeam.shortName || myTeam.name.toUpperCase();
+    if (p1Sub) p1Sub.textContent = `${myTeam.starPlayer} • ${myTeam.region.toUpperCase()}`;
+
+    const rivalAvatar = document.getElementById('matchup-rival-avatar');
+    const rivalName = document.getElementById('matchup-rival-name');
+    const rivalSub = document.getElementById('matchup-rival-sub');
+    if (rivalAvatar) {
+      rivalAvatar.textContent = roundData.opponent.avatar;
+      rivalAvatar.style.borderColor = roundData.opponent.shirtColor;
+      rivalAvatar.style.background = `${roundData.opponent.shirtColor}33`;
+    }
+    if (rivalName) rivalName.textContent = (roundData.opponent.shortName || roundData.opponent.name).toUpperCase();
+    if (rivalSub) rivalSub.textContent = (roundData.opponent.subName || 'RIVAIS DE CAMPINAS').toUpperCase();
 
     // Caixa de Inteligência da Fase
     const intelTag = document.getElementById('intel-stage-tag');
@@ -3079,27 +3511,30 @@ class GameEngine {
     // Botão de ação da fase
     const btnPlayText = document.getElementById('btn-play-round-text');
     if (btnPlayText) {
-      btnPlayText.textContent = `JOGAR ${roundData.name.toUpperCase()}`;
+      btnPlayText.textContent = `JOGAR ${roundData.name.toUpperCase()} (VS ${roundData.opponent.shortName})`;
     }
   }
 
   startTournamentMatch(roundIndex = 0) {
     this.isTournament = true;
-    this.tournamentRound = Math.min(Math.max(0, roundIndex), TOURNAMENT_ROUNDS.length - 1);
+    const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
+    this.tournamentRound = Math.min(Math.max(0, roundIndex), rounds.length - 1);
     this.isGoldenGoal = false;
     this.gameMode = 'TOURNAMENT';
 
-    const roundData = TOURNAMENT_ROUNDS[this.tournamentRound];
+    const roundData = rounds[this.tournamentRound];
+    const myTeam = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
 
-    // Configuração do Jogador 1 (Beiço)
+    // Configuração do Jogador 1 (Time de Campinas Escolhido)
     const p1 = this.players[0];
     p1.isControlled = true;
     p1.controlId = 1;
+    this.applyPlayerTeamAppearance(p1, myTeam);
     p1.speed = 3.0;
     p1.kickPowerMax = 14.5;
     p1.kickPowerMin = 5.5;
 
-    // Configuração do Adversário conforme a Dificuldade e Identidade da Fase
+    // Configuração do Adversário (Time de Campinas da Fase Atual)
     const opp = roundData.opponent;
     const p2 = this.players[1];
     p2.isControlled = false;
@@ -3118,20 +3553,27 @@ class GameEngine {
     p2.kickPowerDefault = opp.kickPowerDefault;
 
     // Atualização dos nomes e ícones no HUD do placar
+    if (this.p1ScoreName) this.p1ScoreName.textContent = myTeam.shortName || myTeam.name;
+    if (this.p1ScoreSub) this.p1ScoreSub.textContent = (myTeam.region || 'CAMPINAS').toUpperCase();
+    if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = myTeam.avatar || '🦅';
+
     if (this.rivalScoreName) this.rivalScoreName.textContent = opp.shortName || opp.name;
-    if (this.rivalScoreSub) this.rivalScoreSub.textContent = opp.subName || 'RIVAL';
+    if (this.rivalScoreSub) this.rivalScoreSub.textContent = (opp.region || opp.subName || 'CAMPINAS').toUpperCase();
     if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = opp.avatar || '⚡';
 
-    // Badge pulsante no topo da tela indicando a fase atual
+    // Badge no topo da tela indicando a fase atual da Taça das Favelas Campinas
     if (this.tournamentStageBadge) {
       this.tournamentStageBadge.classList.remove('hidden');
     }
     if (this.tournamentStageText) {
-      this.tournamentStageText.textContent = `${roundData.badge} (${this.tournamentRound + 1}/4)`;
+      this.tournamentStageText.textContent = `🏆 TAÇA DAS FAVELAS CAMPINAS • ${roundData.badge} (${this.tournamentRound + 1}/4)`;
     }
 
     this.p2PowerHud.classList.add('hidden');
-    document.getElementById('hud-match-hint').textContent = `TAÇA DAS FAVELA: [WASD ou SETAS + SEGURE ESPAÇO/CLIQUE P/ FORÇA] | VS ${opp.name.toUpperCase()}`;
+    const hintEl = document.getElementById('hud-match-hint');
+    if (hintEl) {
+      hintEl.textContent = `TAÇA DAS FAVELAS CAMPINAS: ${myTeam.shortName} VS ${opp.shortName} | [WASD/SETAS + SEGURE ESPAÇO]`;
+    }
 
     // Placar zerado e duração equilibrada (90s)
     this.scoreBeico = 0;
@@ -3335,19 +3777,24 @@ class GameEngine {
     if (this.timerInterval) clearInterval(this.timerInterval);
 
     const wasGoldenGoal = this.isGoldenGoal;
+    const myTeam = (this.isTournament && this.selectedCampinasTeam) ? this.selectedCampinasTeam : null;
+    const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
+    const oppTeam = (this.isTournament && rounds[this.tournamentRound]) ? rounds[this.tournamentRound].opponent : null;
 
     if (scoringTeam === 'beico') {
       this.scoreBeico++;
       this.scoreBeicoEl.classList.add('score-bump');
+      const teamLabel = myTeam ? myTeam.name.toUpperCase() : 'TIME BEIÇO';
       this.goalScorerEl.textContent = wasGoldenGoal
-        ? `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'TIME BEIÇO'} CRAVOU O GOL DE OURO HISTÓRICO!`
-        : `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'TIME BEIÇO'} BROCOU NO ÂNGULO!`;
+        ? `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : teamLabel} CRAVOU O GOL DE OURO HISTÓRICO!`
+        : `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : teamLabel} BROCOU NO ÂNGULO! GOOOL DA QUEBRADA!`;
     } else {
       this.scoreRivais++;
       this.scoreRivaisEl.classList.add('score-bump');
+      const oppLabel = oppTeam ? oppTeam.shortName.toUpperCase() : 'RIVAIS';
       this.goalScorerEl.textContent = wasGoldenGoal
-        ? `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'RIVAIS'} MANDOU O GOL DE OURO DECISIVO!`
-        : `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : 'RIVAIS'} MANDOU PRA REDE!`;
+        ? `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : oppLabel} MARCOU O GOL DE OURO DECISIVO!`
+        : `${this.ball.lastTouchPlayer ? this.ball.lastTouchPlayer.name : oppLabel} MANDOU PRA REDE!`;
     }
 
     setTimeout(() => {
@@ -3429,7 +3876,9 @@ class GameEngine {
 
   showTournamentResult() {
     const curRound = this.tournamentRound;
-    const roundData = TOURNAMENT_ROUNDS[curRound];
+    const rounds = this.tournamentRounds || TOURNAMENT_ROUNDS;
+    const roundData = rounds[curRound];
+    const myTeam = this.selectedCampinasTeam || CAMPINAS_FAVELA_TEAMS[0];
 
     const badgeEl = document.getElementById('tourney-result-badge');
     const iconEl = document.getElementById('tourney-result-icon');
@@ -3438,6 +3887,7 @@ class GameEngine {
 
     const scoreBeicoEl = document.getElementById('tourney-score-beico');
     const scoreRivalEl = document.getElementById('tourney-score-rival');
+    const p1NameEl = document.getElementById('tourney-score-p1-name');
     const rivalNameEl = document.getElementById('tourney-score-rival-name');
 
     const btnNext = document.getElementById('btn-tourney-next');
@@ -3446,6 +3896,7 @@ class GameEngine {
 
     if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreBeico;
     if (scoreRivalEl) scoreRivalEl.textContent = this.scoreRivais;
+    if (p1NameEl) p1NameEl.textContent = myTeam.shortName || myTeam.name;
     if (rivalNameEl) rivalNameEl.textContent = roundData.opponent.shortName || roundData.opponent.name;
 
     badgeEl.classList.remove('badge-eliminated', 'badge-champion');
@@ -3459,25 +3910,25 @@ class GameEngine {
       if (curRound === 3) {
         // CAMPEÃO DA GRANDE FINAL!
         badgeEl.classList.add('badge-champion');
-        badgeEl.textContent = 'CAMPEÃO DA TAÇA DAS FAVELA! 👑';
+        badgeEl.textContent = 'CAMPEÃO DA TAÇA DAS FAVELAS DE CAMPINAS! 👑';
         iconEl.textContent = '🏆';
-        titleEl.textContent = 'É CAMPEÃO! A TAÇA DAS FAVELA É NOSSA!';
+        titleEl.textContent = `É CAMPEÃO! ${myTeam.name.toUpperCase()} LEVANTA A TAÇA!`;
         descEl.textContent = this.isGoldenGoal
-          ? 'GOL DE OURO NA GRANDE FINAL! Você derrubou Gildásio no tempo infinito e levantou a Taça das Favela! A favela tá em festa!'
-          : 'Você amassou Gildásio na Grande Final e conquistou a lendária Taça das Favela! Toda a comunidade tá soltando fogos!';
+          ? `GOL DE OURO NA GRANDE FINAL! O ${myTeam.name} derrubou o ${roundData.opponent.teamFullName || roundData.opponent.shortName} no tempo infinito e levantou a cobiçada Taça das Favelas de Campinas! A comunidade inteira está em festa!`
+          : `O ${myTeam.name} deu aula na Grande Final contra o ${roundData.opponent.teamFullName || roundData.opponent.shortName} e conquistou a histórica Taça das Favelas de Campinas! O troféu é da quebrada!`;
 
         btnNext.classList.remove('hidden');
         if (btnNextText) btnNextText.textContent = 'NOVO TORNEIO 🏆';
         btnRetry.classList.add('hidden');
       } else {
         // AVANÇOU PARA A PRÓXIMA FASE!
-        const nextRound = TOURNAMENT_ROUNDS[curRound + 1];
+        const nextRound = rounds[curRound + 1];
         badgeEl.textContent = 'CLASSIFICADO!';
         iconEl.textContent = '⭐';
-        titleEl.textContent = `AVANÇOU PARA AS ${nextRound.name.toUpperCase()}!`;
+        titleEl.textContent = `${myTeam.shortName.toUpperCase()} AVANÇOU PARA AS ${nextRound.name.toUpperCase()}!`;
         descEl.textContent = this.isGoldenGoal
-          ? `GOL DE OURO SALVADOR! Você eliminou ${roundData.opponent.name} na morte súbita da Taça das Favela! Agora vem ${nextRound.opponent.name}!`
-          : `Vitória maiúscula! Você eliminou ${roundData.opponent.name} na Taça das Favela. Prepare o pé porque ${nextRound.opponent.name} te espera!`;
+          ? `GOL DE OURO SALVADOR! O ${myTeam.name} eliminou o ${roundData.opponent.shortName} na morte súbita da Taça das Favelas de Campinas! Prepare-se: o próximo desafio é contra ${nextRound.opponent.shortName}!`
+          : `Vitória maiúscula! O ${myTeam.name} superou o ${roundData.opponent.shortName} na Taça das Favelas de Campinas. Na próxima fase o duelo é contra o ${nextRound.opponent.shortName}!`;
 
         btnNext.classList.remove('hidden');
         if (btnNextText) btnNextText.textContent = `PRÓXIMA FASE (${nextRound.name.toUpperCase()}) ➔`;
@@ -3486,12 +3937,12 @@ class GameEngine {
     } else {
       // ELIMINADO DO TORNEIO
       badgeEl.classList.add('badge-eliminated');
-      badgeEl.textContent = 'ELIMINADO DA TAÇA DAS FAVELA';
+      badgeEl.textContent = 'ELIMINADO DA TAÇA DAS FAVELAS DE CAMPINAS';
       iconEl.textContent = '💀';
-      titleEl.textContent = 'FIM DA LINHA NA TAÇA DAS FAVELA!';
+      titleEl.textContent = `FIM DA LINHA PARA O ${myTeam.shortName.toUpperCase()}!`;
       descEl.textContent = this.isGoldenGoal
-        ? `${roundData.opponent.name} cravou o Gol de Ouro no tempo infinito. Na Taça das Favela só os fortes sobrevivem: treine e tente de novo!`
-        : `${roundData.opponent.name} levou a melhor nessa fase da Taça das Favela. Na favela não tem moleza: treine e tente de novo!`;
+        ? `O ${roundData.opponent.shortName} cravou o Gol de Ouro no tempo infinito. Na Taça das Favelas de Campinas só os fortes sobrevivem: treine e volte para buscar a taça!`
+        : `O ${roundData.opponent.shortName} levou a melhor nesta rodada. Mas a quebrada do ${myTeam.name} nunca desiste: treine e tente novamente!`;
 
       btnNext.classList.add('hidden');
       btnRetry.classList.remove('hidden');
@@ -3521,6 +3972,10 @@ class GameEngine {
       this.tournamentResultModal.classList.remove('active');
       this.tournamentResultModal.classList.add('hidden');
     }
+
+    if (this.p1ScoreName) this.p1ScoreName.textContent = 'BEIÇO';
+    if (this.p1ScoreSub) this.p1ScoreSub.textContent = 'CRIAS DA VILA';
+    if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = '⚡';
 
     if (this.rivalScoreName) this.rivalScoreName.textContent = 'RIVAIS';
     if (this.rivalScoreSub) this.rivalScoreSub.textContent = 'DO OUTRO LADO';

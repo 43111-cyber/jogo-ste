@@ -1532,3 +1532,250 @@ html, body {
     align-items: stretch;
   }
 }
+
+/* ==========================================================
+   SELEÇÃO DE TIMES — TAÇA DAS FAVELAS DE CAMPINAS
+   ========================================================== */
+.campinas-selection-section {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.6);
+}
+
+.selection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selection-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.campinas-city-badge {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff;
+  font-family: var(--font-arcade);
+  font-size: 0.72rem;
+  letter-spacing: 0.8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.selection-heading {
+  font-family: var(--font-arcade);
+  font-size: 0.95rem;
+  color: var(--sunset-gold);
+  letter-spacing: 0.5px;
+}
+
+.selection-counter {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.15);
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.campinas-teams-scroll-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  width: 100%;
+}
+
+.scroll-arrow-btn {
+  background: rgba(30, 41, 59, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 1.1rem;
+  width: 34px;
+  height: 52px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.scroll-arrow-btn:hover {
+  background: var(--sunset-gold);
+  color: #000;
+  border-color: #facc15;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.6);
+  transform: scale(1.06);
+}
+
+.campinas-teams-carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 10px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sunset-gold) rgba(0, 0, 0, 0.4);
+  width: 100%;
+}
+
+.campinas-teams-carousel::-webkit-scrollbar {
+  height: 6px;
+}
+
+.campinas-teams-carousel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+}
+
+.campinas-teams-carousel::-webkit-scrollbar-thumb {
+  background: var(--sunset-gold);
+  border-radius: 4px;
+}
+
+.team-card-campinas {
+  min-width: 146px;
+  max-width: 146px;
+  background: rgba(17, 24, 39, 0.88);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.team-card-campinas:hover {
+  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(250, 204, 21, 0.6);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(250, 204, 21, 0.3);
+}
+
+.team-card-campinas.selected {
+  border-color: #facc15;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.5), inset 0 0 12px rgba(250, 204, 21, 0.18);
+  transform: translateY(-2px);
+}
+
+.team-card-badge-active {
+  position: absolute;
+  top: -8px;
+  right: 6px;
+  background: #facc15;
+  color: #000;
+  font-family: var(--font-arcade);
+  font-size: 0.6rem;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.8);
+  font-weight: 800;
+}
+
+.team-card-avatar-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.team-card-kit-preview {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin: 1px 0;
+}
+
+.kit-swatch-shirt,
+.kit-swatch-shorts {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.team-card-name {
+  font-family: var(--font-arcade);
+  font-size: 0.82rem;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.team-card-region {
+  font-size: 0.65rem;
+  color: var(--street-gray);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.team-card-player {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #38bdf8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.team-card-stats {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  padding: 3px 2px;
+  margin-top: 2px;
+}
+
+.team-card-stats span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.stat-label {
+  font-size: 0.5rem;
+  color: var(--street-gray);
+}
+
