@@ -366,6 +366,37 @@ const WORLD = {
 // Inclui também comunidades de edições/categorias anteriores (2022–2026).
 // tier 1 = semifinalistas / campeão, 2 = quartas, 3 = demais times
 // ====================================================================
+// ====================================================================
+// FOTOS / ESCUDOS DOS TIMES
+// Coloque as imagens na pasta /times com o id do time (ex.: times/padre-anchieta.png).
+// Aceita png, jpg, jpeg, webp ou svg. Se não achar a imagem, usa o emoji do time.
+// ====================================================================
+const TEAM_IMG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+const TEAM_IMG_CACHE = {}; // id -> url encontrada (string) ou null (não existe)
+
+function teamAvatarHTML(id, emoji) {
+  const fallback = `<span>${emoji || '⚽'}</span>`;
+  if (!id || TEAM_IMG_CACHE[id] === null) return fallback;
+  const src = TEAM_IMG_CACHE[id] || `times/${id}.${TEAM_IMG_EXTS[0]}`;
+  const emojiAttr = String(emoji || '⚽').replace(/"/g, '&quot;');
+  return `<img class="team-img" src="${src}" data-id="${id}" data-i="${TEAM_IMG_EXTS.indexOf(src.split('.').pop())}" data-emoji="${emojiAttr}" alt="" draggable="false" onload="teamImgOk(this)" onerror="teamImgFail(this)">`;
+}
+function teamImgOk(img) {
+  TEAM_IMG_CACHE[img.dataset.id] = img.getAttribute('src');
+}
+function teamImgFail(img) {
+  const i = (parseInt(img.dataset.i, 10) || 0) + 1;
+  if (i < TEAM_IMG_EXTS.length) {
+    img.dataset.i = i;
+    img.src = `times/${img.dataset.id}.${TEAM_IMG_EXTS[i]}`;
+  } else {
+    TEAM_IMG_CACHE[img.dataset.id] = null;
+    const span = document.createElement('span');
+    span.textContent = img.dataset.emoji;
+    img.replaceWith(span);
+  }
+}
+
 const _TEAM_DATA = [
   // id, nome, nome curto, camisa, calção, tier, avatar, tagline especial
   ['padre-anchieta',  'Padre Anchieta',  'P. ANCHIETA',  '#16a34a', '#ffffff', 1, '🏆', 'Campeão da Taça 2026 👑'],
@@ -3264,7 +3295,7 @@ class GameEngine {
       card.innerHTML = `
         ${this.selectedCampinasTeam && this.selectedCampinasTeam.id === team.id ? '<div class="team-card-badge-active">SEU TIME ⭐</div>' : ''}
         <div class="team-card-avatar-wrap" style="background: ${team.shirtColor}22; border-color: ${team.shirtColor};">
-          <span>${team.avatar}</span>
+          ${teamAvatarHTML(team.id, team.avatar)}
         </div>
         <div class="team-card-kit-preview" title="Cores do manto">
           <div class="kit-swatch-shirt" style="background: ${team.shirtColor};" title="Camisa"></div>
@@ -3693,7 +3724,7 @@ class GameEngine {
         card.title = isTaken ? 'Já escolhido pelo outro lado' : team.name;
         card.innerHTML = `
           ${isOwn ? `<div class="ts-card-tag">${side === 'p1' ? 'P1' : (this.pickMode === '2P' ? 'P2' : 'CPU')}</div>` : ''}
-          <div class="ts-card-avatar" style="background:${team.shirtColor}; border-color:${team.shortsColor};">${team.avatar}</div>
+          <div class="ts-card-avatar" style="background:${team.shirtColor}; border-color:${team.shortsColor};">${teamAvatarHTML(team.id, team.avatar)}</div>
           <div class="ts-card-name">${team.name}</div>
           <div class="ts-card-kit"><span style="background:${team.shirtColor}"></span><span style="background:${team.shortsColor}"></span></div>
         `;
@@ -3709,7 +3740,7 @@ class GameEngine {
 
       const sel = T.find(t => t.id === ownId);
       box.innerHTML = `
-        <div class="ts-selected-avatar" style="background:${sel.shirtColor}; border-color:${sel.shortsColor};">${sel.avatar}</div>
+        <div class="ts-selected-avatar" style="background:${sel.shirtColor}; border-color:${sel.shortsColor};">${teamAvatarHTML(sel.id, sel.avatar)}</div>
         <div>
           <div class="ts-selected-name">${sel.name.toUpperCase()}</div>
           <div class="ts-selected-meta">${sel.starPlayer} • VEL ${sel.stats.vel} • CHU ${sel.stats.chute} • RAÇA ${sel.stats.raca}</div>
@@ -3781,7 +3812,7 @@ class GameEngine {
       const diffEl = document.getElementById(`bracket-diff-${i}`);
       const rData = rounds[i];
 
-      if (avatarEl && rData) avatarEl.textContent = rData.opponent.avatar;
+      if (avatarEl && rData) avatarEl.innerHTML = teamAvatarHTML(rData.opponent.teamId, rData.opponent.avatar);
       if (nameEl && rData) nameEl.textContent = rData.opponent.shortName || rData.opponent.teamFullName;
       if (diffEl && rData) diffEl.textContent = `${rData.difficultyLabel} ${rData.stars}`;
 
@@ -3810,7 +3841,7 @@ class GameEngine {
     const p1Name = document.getElementById('matchup-p1-name');
     const p1Sub = document.getElementById('matchup-p1-sub');
     if (p1Avatar) {
-      p1Avatar.textContent = myTeam.avatar;
+      p1Avatar.innerHTML = teamAvatarHTML(myTeam.id, myTeam.avatar);
       p1Avatar.style.borderColor = myTeam.shirtColor;
       p1Avatar.style.background = `${myTeam.shirtColor}33`;
     }
@@ -3821,7 +3852,7 @@ class GameEngine {
     const rivalName = document.getElementById('matchup-rival-name');
     const rivalSub = document.getElementById('matchup-rival-sub');
     if (rivalAvatar) {
-      rivalAvatar.textContent = roundData.opponent.avatar;
+      rivalAvatar.innerHTML = teamAvatarHTML(roundData.opponent.teamId, roundData.opponent.avatar);
       rivalAvatar.style.borderColor = roundData.opponent.shirtColor;
       rivalAvatar.style.background = `${roundData.opponent.shirtColor}33`;
     }
@@ -3887,11 +3918,11 @@ class GameEngine {
     // Atualização dos nomes e ícones no HUD do placar
     if (this.p1ScoreName) this.p1ScoreName.textContent = myTeam.shortName || myTeam.name;
     if (this.p1ScoreSub) this.p1ScoreSub.textContent = (myTeam.region || 'CAMPINAS').toUpperCase();
-    if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = myTeam.avatar || '🦅';
+    if (this.p1ScoreLogo) this.p1ScoreLogo.innerHTML = teamAvatarHTML(myTeam.id, myTeam.avatar || '🦅');
 
     if (this.rivalScoreName) this.rivalScoreName.textContent = opp.shortName || opp.name;
     if (this.rivalScoreSub) this.rivalScoreSub.textContent = (opp.region || opp.subName || 'CAMPINAS').toUpperCase();
-    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = opp.avatar || '⚡';
+    if (this.rivalScoreLogo) this.rivalScoreLogo.innerHTML = teamAvatarHTML(opp.teamId, opp.avatar || '⚡');
 
     // Badge no topo da tela indicando a fase atual da Taça das Favelas Campinas
     if (this.tournamentStageBadge) {
@@ -3953,10 +3984,10 @@ class GameEngine {
     const diff0 = DIFFICULTIES[this.difficulty] || DIFFICULTIES.medium;
     if (this.p1ScoreName) this.p1ScoreName.textContent = teams.t1.shortName;
     if (this.p1ScoreSub) this.p1ScoreSub.textContent = mode === '2P' ? 'JOGADOR 1' : 'VOCÊ';
-    if (this.p1ScoreLogo) this.p1ScoreLogo.textContent = teams.t1.avatar;
+    if (this.p1ScoreLogo) this.p1ScoreLogo.innerHTML = teamAvatarHTML(teams.t1.id, teams.t1.avatar);
     if (this.rivalScoreName) this.rivalScoreName.textContent = teams.t2.shortName;
     if (this.rivalScoreSub) this.rivalScoreSub.textContent = mode === '2P' ? 'JOGADOR 2' : ('CPU • ' + diff0.label);
-    if (this.rivalScoreLogo) this.rivalScoreLogo.textContent = teams.t2.avatar;
+    if (this.rivalScoreLogo) this.rivalScoreLogo.innerHTML = teamAvatarHTML(teams.t2.id, teams.t2.avatar);
 
     // Atualizar jogadores
     const p1 = this.players[0]; // Beiço
@@ -4279,6 +4310,8 @@ class GameEngine {
     if (btnRank) btnRank.classList.add('hidden');
     const rankInfo = document.getElementById('tourney-rank-info');
     if (rankInfo) rankInfo.classList.add('hidden');
+    const nameBox0 = document.getElementById('champ-name-box');
+    if (nameBox0) nameBox0.classList.add('hidden');
 
     if (scoreBeicoEl) scoreBeicoEl.textContent = this.scoreText('beico');
     if (scoreRivalEl) scoreRivalEl.textContent = this.scoreText('rivais');
@@ -4449,14 +4482,89 @@ class GameEngine {
       const cls = ['rk-row', hasWins ? '' : 'rk-empty', t.id === mineId ? 'rk-mine' : '', (hasWins && i === 0) ? 'rk-top1' : ''].join(' ').replace(/\s+/g, ' ').trim();
       return `<li class="${cls}" data-team-id="${t.id}">
         <span class="rk-pos">${pos}</span>
-        <span class="rk-avatar" style="background:${t.shirtColor}; border-color:${t.shortsColor};">${t.avatar}</span>
+        <span class="rk-avatar" style="background:${t.shirtColor}; border-color:${t.shortsColor};">${teamAvatarHTML(t.id, t.avatar)}</span>
         <span class="rk-name">${t.name}${t.id === mineId ? '<span class="rk-you">SEU TIME</span>' : ''}</span>
         <span class="rk-wins">${r.wins}<small>${r.wins === 1 ? 'TÍTULO' : 'TÍTULOS'}</small></span>
       </li>`;
     }).join('');
 
+    this.renderHall(data.hall);
+
     const mine = list.querySelector('.rk-mine');
     if (mine) mine.scrollIntoView({ block: 'nearest' });
+  }
+
+  escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  renderHall(hall) {
+    const el = document.getElementById('hall-list');
+    if (!el) return;
+    if (!hall || !hall.length) {
+      el.innerHTML = '<li class="hall-empty">Nenhum nome no Hall ainda. Seja campeão e coloque o seu!</li>';
+      return;
+    }
+    el.innerHTML = hall.map((h) => `<li>
+        <span>👑</span>
+        <span class="hall-name">${this.escapeHtml(h.name)}</span>
+        <span class="hall-team">campeão com ${this.escapeHtml(this.teamNameById(h.teamId))}</span>
+        <span class="hall-date">${new Date(h.t).toLocaleDateString('pt-BR')}</span>
+      </li>`).join('');
+  }
+
+  // Depois do título: campo para o campeão colocar o nome no Hall
+  showChampNameBox(winId) {
+    const box = document.getElementById('champ-name-box');
+    const input = document.getElementById('champ-name-input');
+    const btn = document.getElementById('champ-name-btn');
+    const msg = document.getElementById('champ-name-msg');
+    if (!box || !input || !btn) return;
+    this.pendingWinId = winId;
+    msg.textContent = '';
+    msg.className = 'champ-name-msg';
+    btn.disabled = false;
+    input.disabled = false;
+    try { input.value = localStorage.getItem('jogo-ste-nome') || ''; } catch (e) { input.value = ''; }
+    box.classList.remove('hidden');
+
+    if (!this._champNameBound) {
+      this._champNameBound = true;
+      // Digitar no campo não pode disparar controles do jogo
+      ['keydown', 'keyup', 'keypress'].forEach((ev) => input.addEventListener(ev, (e) => {
+        e.stopPropagation();
+        if (ev === 'keydown' && e.key === 'Enter') { e.preventDefault(); btn.click(); }
+      }));
+      btn.addEventListener('click', () => this.submitChampName());
+    }
+  }
+
+  async submitChampName() {
+    const input = document.getElementById('champ-name-input');
+    const btn = document.getElementById('champ-name-btn');
+    const msg = document.getElementById('champ-name-msg');
+    const name = (input.value || '').trim();
+    if (!name) { msg.className = 'champ-name-msg error'; msg.textContent = 'Digite um nome.'; return; }
+    if (!this.pendingWinId) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/champion-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winId: this.pendingWinId, name })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) throw new Error(d.error || 'falha');
+      try { localStorage.setItem('jogo-ste-nome', name); } catch (e) {}
+      input.disabled = true;
+      msg.className = 'champ-name-msg';
+      msg.textContent = '✅ Seu nome está no Hall dos Campeões! Veja no Ranking.';
+      this.pendingWinId = null;
+    } catch (e) {
+      btn.disabled = false;
+      msg.className = 'champ-name-msg error';
+      msg.textContent = 'Não deu pra salvar o nome. Tente de novo.';
+    }
   }
 
   closeRanking() {
@@ -4483,6 +4591,7 @@ class GameEngine {
       if (r.status === 429) { show('🏅 Seu título já foi registrado há pouco. Confira o ranking!'); return; }
       if (!r.ok || !d.ok) throw new Error('falha');
       const tit = d.wins === 1 ? 'título' : 'títulos';
+      if (d.winId) this.showChampNameBox(d.winId);
       if (d.position === 1) {
         show(`👑 ${team.name.toUpperCase()} É O TOP 1 DO RANKING com ${d.wins} ${tit}!`);
       } else {
