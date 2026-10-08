@@ -2064,3 +2064,40 @@ body.penalties .bottom-hint, body.penalties .power-hud { display: none !importan
 
 /* Botões escondidos de verdade (ex.: tela de resultado do torneio) */
 .btn-street.hidden { display: none !important; }
+
+/* ==========================================================
+   RANKING GLOBAL DOS TIMES
+   ========================================================== */
+.ranking-box {
+  background: #050505; border: 3px solid var(--beico-yellow); border-radius: 10px;
+  width: min(640px, 94vw); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 0 0 3px #000, 0 0 0 6px var(--beico-green), 0 0 0 9px #000, 0 0 0 12px var(--beico-blue), 0 20px 60px rgba(0,0,0,0.8);
+  animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.ranking-body { padding: 12px 18px; overflow-y: auto; min-height: 120px; flex: 1; scrollbar-width: thin; scrollbar-color: var(--beico-green) #000; }
+.ranking-status { font-size: 0.82rem; font-weight: 700; color: #cbd5e1; text-align: center; margin-bottom: 8px; }
+.ranking-status.error { color: #f87171; }
+.ranking-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.rk-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 8px;
+  background: #0e0e0e; border: 2px solid rgba(255,255,255,0.1);
+}
+.rk-row.rk-empty { opacity: 0.5; }
+.rk-row.rk-mine { border-color: var(--beico-yellow); background: #151300; box-shadow: 0 0 14px rgba(255, 212, 0, 0.45); opacity: 1; }
+.rk-row.rk-top1 { border-color: #facc15; background: linear-gradient(90deg, #2a2100, #0e0e0e); }
+.rk-pos { font-family: var(--font-title); font-size: 1.1rem; min-width: 38px; text-align: center; color: #94a3b8; }
+.rk-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; border: 2px solid #fff; flex-shrink: 0; }
+.rk-name { font-family: var(--font-arcade); font-size: 0.92rem; letter-spacing: 0.3px; flex: 1; text-transform: uppercase; }
+.rk-you { font-size: 0.6rem; font-weight: 900; color: #000; background: var(--beico-yellow); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+.rk-wins { font-family: var(--font-title); font-size: 1.15rem; color: var(--beico-yellow); white-space: nowrap; }
+.rk-wins small { font-family: var(--font-arcade); font-size: 0.6rem; color: #94a3b8; margin-left: 3px; }
+.tourney-rank-line { font-size: 0.8rem; font-weight: 800; color: #facc15; text-align: center; min-height: 1.1em; }
+.tourney-rank-info { font-family: var(--font-arcade); font-size: 0.95rem; color: #facc15; background: rgba(250, 204, 21, 0.1); border: 1px solid rgba(250, 204, 21, 0.5); border-radius: 10px; padding: 8px 14px; max-width: 420px; line-height: 1.35; }
+.tourney-rank-info.hidden { display: none; }
+
+/* Menu compacto em telas de pouca altura (5 botões) */
+@media (max-height: 790px) {
+  .menu-buttons { gap: 8px; margin-bottom: 10px; }
+  .menu-buttons .btn-street { padding: 10px 20px; }
+  .logo-wrapper { margin-bottom: 4px; }
+}
