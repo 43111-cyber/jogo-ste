@@ -2101,3 +2101,26 @@ body.penalties .bottom-hint, body.penalties .power-hud { display: none !importan
   .menu-buttons .btn-street { padding: 10px 20px; }
   .logo-wrapper { margin-bottom: 4px; }
 }
+
+/* ===== Fotos / escudos dos times (pasta /times) ===== */
+.team-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; pointer-events: none; }
+.team-logo, .team-card-avatar-wrap, .matchup-avatar, .ts-card-avatar, .ts-selected-avatar, .rk-avatar { overflow: hidden; }
+span.rival-avatar > .team-img { width: 1.5em; height: 1.5em; display: inline-block; vertical-align: middle; }
+
+/* ===== Hall dos campeões / nome do vencedor ===== */
+.champ-name-box { display: flex; flex-direction: column; gap: 6px; align-items: center; margin: 8px auto; max-width: 420px; width: 100%; }
+.champ-name-box.hidden { display: none; }
+.champ-name-box label { font-family: var(--font-arcade); font-size: 0.85rem; color: #facc15; }
+.champ-name-row { display: flex; gap: 8px; width: 100%; }
+.champ-name-row input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 2px solid #facc15; background: #0b0b0b; color: #fff; font-size: 1rem; font-family: inherit; }
+.champ-name-row input:focus { outline: none; box-shadow: 0 0 10px rgba(250, 204, 21, 0.6); }
+.champ-name-row .btn-street { padding: 8px 16px; }
+.champ-name-msg { font-size: 0.8rem; font-weight: 800; min-height: 1.1em; color: #4ade80; }
+.champ-name-msg.error { color: #f87171; }
+.hall-title { font-family: var(--font-arcade); font-size: 0.85rem; color: #facc15; margin: 14px 0 6px; text-align: center; }
+.hall-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.hall-list li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: rgba(250, 204, 21, 0.08); border: 1px solid rgba(250, 204, 21, 0.3); font-size: 0.82rem; }
+.hall-list .hall-name { font-family: var(--font-arcade); color: #fff; font-weight: 800; }
+.hall-list .hall-team { opacity: 0.85; flex: 1; }
+.hall-list .hall-date { opacity: 0.6; font-size: 0.72rem; white-space: nowrap; }
+.hall-empty { text-align: center; font-size: 0.8rem; opacity: 0.7; padding: 6px; }
