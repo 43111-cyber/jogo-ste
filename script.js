@@ -466,6 +466,95 @@ const CAMPINAS_FAVELA_TEAMS = _TEAM_DATA.map((d, i) => {
   };
 });
 
+// ==RK-LOCAL-START==
+// ====================================================================
+// RANKING LOCAL (só neste navegador, não precisa de servidor)
+// Os números dos outros times são sorteados na primeira vez e depois
+// vão subindo um pouco a cada título do jogador. O time do jogador sobe
+// de verdade conforme ele ganha a Taça.
+// ====================================================================
+const RK_KEY = 'jogo-ste-ranking-v1';
+
+function rkSeed() {
+  const counts = {}, last = {};
+  CAMPINAS_FAVELA_TEAMS.forEach((t, i) => {
+    const [lo, hi] = t.tier === 1 ? [8, 20] : (t.tier === 2 ? [4, 12] : [0, 8]);
+    counts[t.id] = lo + Math.floor(Math.random() * (hi - lo + 1));
+    last[t.id] = i + 1;
+  });
+  return { counts, last, hall: [] };
+}
+function rkLoad() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(RK_KEY)); } catch (e) { s = null; }
+  if (!s || !s.counts || !s.hall) { s = rkSeed(); rkSave(s); }
+  return s;
+}
+function rkSave(s) {
+  try { localStorage.setItem(RK_KEY, JSON.stringify(s)); } catch (e) {}
+}
+function rkCleanName(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.normalize('NFC').replace(/[^\p{L}\p{N} ._-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+}
+function rkTop(s) {
+  const map = new Map();
+  s.hall.forEach((h) => {
+    if (!h.name) return;
+    const key = h.name.toLowerCase();
+    const cur = map.get(key) || { name: h.name, wins: 0, last: 0, teamId: h.teamId };
+    cur.wins += 1; cur.last = h.t; cur.teamId = h.teamId;
+    map.set(key, cur);
+  });
+  return Array.from(map.values())
+    .sort((a, b) => (b.wins - a.wins) || (a.last - b.last))
+    .slice(0, 10)
+    .map((p) => ({ name: p.name, wins: p.wins, teamId: p.teamId }));
+}
+function rkData(s) {
+  s = s || rkLoad();
+  const ranking = Object.keys(s.counts)
+    .filter((id) => s.counts[id] > 0)
+    .sort((a, b) => (s.counts[b] - s.counts[a]) || ((s.last[a] || 0) - (s.last[b] || 0)))
+    .map((id) => ({ id, wins: s.counts[id] }));
+  const total = ranking.reduce((sum, r) => sum + r.wins, 0);
+  const hall = s.hall.filter((h) => h.name).slice(-10).reverse().map((h) => ({ name: h.name, teamId: h.teamId, t: h.t }));
+  return { ranking, total, hall, top: rkTop(s) };
+}
+// Registra um título: o time do jogador sobe e 1 ou 2 rivais sobem um pouco também
+function rkRecordWin(teamId) {
+  const s = rkLoad();
+  const now = Date.now();
+  s.counts[teamId] = (s.counts[teamId] || 0) + 1;
+  s.last[teamId] = now;
+  const others = CAMPINAS_FAVELA_TEAMS.filter((t) => t.id !== teamId);
+  for (let k = 0; k < 2; k++) {
+    if (Math.random() < 0.6) {
+      const o = others[Math.floor(Math.random() * others.length)];
+      s.counts[o.id] += 1;
+      s.last[o.id] = now + k + 1;
+    }
+  }
+  const winId = 'w' + now.toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+  s.hall.push({ id: winId, teamId, name: '', t: now });
+  if (s.hall.length > 500) s.hall = s.hall.slice(-500);
+  rkSave(s);
+  const data = rkData(s);
+  return { ok: true, teamId, wins: s.counts[teamId], position: data.ranking.findIndex((r) => r.id === teamId) + 1, ranking: data.ranking, winId };
+}
+function rkSetName(winId, rawName) {
+  const s = rkLoad();
+  const entry = s.hall.find((h) => h.id === winId);
+  const name = rkCleanName(rawName);
+  if (!entry) throw new Error('Título não encontrado');
+  if (entry.name) throw new Error('Nome já registrado');
+  if (!name) throw new Error('Nome inválido');
+  entry.name = name;
+  rkSave(s);
+  return rkData(s);
+}
+// ==RK-LOCAL-END==
+
 function _pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function generateCampinasTournamentRounds(userTeamId) {
@@ -4394,9 +4483,7 @@ class GameEngine {
   // ====================================================================
   async fetchRanking() {
     try {
-      const r = await fetch('/api/ranking', { cache: 'no-store' });
-      if (!r.ok) throw new Error('http ' + r.status);
-      return await r.json();
+      return rkData();
     } catch (e) {
       return null; // servidor offline / aberto como arquivo
     }
@@ -4457,7 +4544,7 @@ class GameEngine {
     const list = document.getElementById('ranking-list');
     if (!data) {
       status.className = 'ranking-status error';
-      status.textContent = '⚠️ Não foi possível carregar o ranking. Abra o jogo pelo servidor (node server.js).';
+      status.textContent = '⚠️ Não foi possível carregar o ranking.';
       list.innerHTML = '';
       return;
     }
@@ -4488,7 +4575,7 @@ class GameEngine {
       </li>`;
     }).join('');
 
-    this.renderHall(data.hall);
+    this.renderHall(data.hall, data.top);
 
     const mine = list.querySelector('.rk-mine');
     if (mine) mine.scrollIntoView({ block: 'nearest' });
@@ -4498,7 +4585,14 @@ class GameEngine {
     return String(str).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
 
-  renderHall(hall) {
+  renderHall(hall, top) {
+    const topEl = document.getElementById('top-list');
+    if (topEl) {
+      const medals = ['🥇', '🥈', '🥉'];
+      topEl.innerHTML = (top && top.length)
+        ? top.map((p, i) => `<li><span>${medals[i] || (i + 1) + 'º'}</span><span class="hall-name">${this.escapeHtml(p.name)}</span><span class="hall-team">${this.escapeHtml(this.teamNameById(p.teamId))}</span><span class="hall-date">${p.wins} ${p.wins === 1 ? 'título' : 'títulos'}</span></li>`).join('')
+        : '<li class="hall-empty">Ainda não há campeões com nome.</li>';
+    }
     const el = document.getElementById('hall-list');
     if (!el) return;
     if (!hall || !hall.length) {
@@ -4548,13 +4642,7 @@ class GameEngine {
     if (!this.pendingWinId) return;
     btn.disabled = true;
     try {
-      const r = await fetch('/api/champion-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ winId: this.pendingWinId, name })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok || !d.ok) throw new Error(d.error || 'falha');
+      rkSetName(this.pendingWinId, name);
       try { localStorage.setItem('jogo-ste-nome', name); } catch (e) {}
       input.disabled = true;
       msg.className = 'champ-name-msg';
@@ -4582,14 +4670,7 @@ class GameEngine {
     const show = (txt) => { if (box) { box.textContent = txt; box.classList.remove('hidden'); } };
     show('🏅 Registrando o título no ranking...');
     try {
-      const r = await fetch('/api/champion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId: team.id })
-      });
-      const d = await r.json().catch(() => ({}));
-      if (r.status === 429) { show('🏅 Seu título já foi registrado há pouco. Confira o ranking!'); return; }
-      if (!r.ok || !d.ok) throw new Error('falha');
+      const d = rkRecordWin(team.id);
       const tit = d.wins === 1 ? 'título' : 'títulos';
       if (d.winId) this.showChampNameBox(d.winId);
       if (d.position === 1) {
@@ -4599,7 +4680,7 @@ class GameEngine {
         show(`🏅 ${team.name.toUpperCase()} agora é #${d.position} no ranking com ${d.wins} ${tit}. Líder: ${this.teamNameById(lead.id)} (${lead.wins}). Bora subir!`);
       }
     } catch (e) {
-      show('⚠️ Não consegui registrar o título no ranking (servidor offline). Abra o jogo pelo servidor: node server.js');
+      show('⚠️ Não consegui registrar o título no ranking.');
     }
   }
 
